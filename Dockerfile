@@ -9,9 +9,9 @@ FROM node:18-slim AS frontend-build
 
 WORKDIR /frontend
 
-# Copy package files and install deps
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+# Copy package files and install deps (excluding package-lock to avoid cross-platform native binding errors)
+COPY package.json ./
+RUN npm install
 
 # Copy frontend source and build
 # VITE_API_URL="" makes API calls relative (same-origin), which is required
