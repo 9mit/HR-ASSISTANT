@@ -173,10 +173,10 @@ async def health_check() -> dict[str, Any]:
     }
 
 
-@api_router.get("/smtp-status")
-async def smtp_status() -> dict[str, Any]:
-    """Return SMTP configuration status for the frontend."""
-    return email_service.get_smtp_status()
+@api_router.get("/email-status")
+async def email_status() -> dict[str, Any]:
+    """Return email configuration status (Resend or SMTP) for the frontend."""
+    return email_service.get_email_status()
 
 
 @api_router.get("/local-models", response_model=LocalModelCatalogResponse)

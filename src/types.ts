@@ -131,10 +131,11 @@ export interface EphemeralKeys {
   GROQ_API_KEY?: string;
 }
 
-export interface SmtpStatus {
+export interface EmailStatus {
   configured: boolean;
-  server: string;
-  port: number;
+  provider: 'resend' | 'smtp' | 'none';
+  server?: string;
+  port?: number;
   from_email: string | null;
   note: string;
 }
