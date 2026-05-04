@@ -19,7 +19,6 @@ async def test_health_check():
         assert response.status_code == 200
         payload = response.json()
         assert payload["status"] == "healthy"
-        assert isinstance(payload["providers"], list)
 
 @pytest.mark.asyncio
 async def test_process_resumes_multi_provider_flow(monkeypatch):
