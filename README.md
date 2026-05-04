@@ -1,3 +1,12 @@
+---
+title: HR ASSISTANT
+emoji: 🏢
+colorFrom: green
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # HR Ranking System — Production-Grade Candidate Intelligence
 
 A **bias-free, fully-local** HR candidate ranking platform built with FastAPI, React, and PostgreSQL. No paid APIs, complete auditability, and explainable scoring.
