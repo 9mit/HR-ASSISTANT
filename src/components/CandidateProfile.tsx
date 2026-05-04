@@ -16,7 +16,7 @@ type Tab = 'overview' | 'resume' | 'audit' | 'github' | 'email' | 'notes';
 
 export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: CandidateProfileProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },

@@ -12,7 +12,7 @@ export function NotesPanel({ candidateId, initialNotes = '', onUpdateNotes }: No
   const [notes, setNotes] = useState(initialNotes);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
   const handleSave = async () => {
     setIsSaving(true);

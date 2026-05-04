@@ -55,7 +55,7 @@ export default function App() {
   const [autoSendEmails, setAutoSendEmails] = useState(false);
   const [batchId, setBatchId] = useState<string | null>(null);
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
   const ephemeralHeader = serializeKeys(ephemeralKeys);
 

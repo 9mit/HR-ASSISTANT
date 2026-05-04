@@ -14,7 +14,7 @@ export function EmailPanel({ emailContent, candidateName, candidateEmail, candid
   const [isSent, setIsSent] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
   const handleSend = async () => {
     setIsSending(true);
