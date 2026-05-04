@@ -1,0 +1,38 @@
+[project]
+name = "hr-ranking-system"
+version = "1.0.0"
+description = "Production-grade bias-free HR candidate ranking system"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.104.1",
+  "uvicorn[standard]>=0.24.0",
+  "sqlalchemy>=2.0.23",
+  "psycopg2-binary>=2.9.9",
+  "pydantic>=2.5.0",
+  "pydantic-settings>=2.1.0",
+  "python-multipart>=0.0.6",
+  "requests>=2.31.0",
+  "beautifulsoup4>=4.12.2",
+  "lxml>=4.9.3",
+  "pypdf>=3.17.0",
+  "python-docx>=0.8.11",
+  "spacy>=3.7.2",
+  "scikit-learn>=1.3.2",
+  "sentence-transformers>=2.2.2",
+  "email-validator>=2.1.0",
+  "aiosmtplib>=3.0.1",
+  "python-json-logger>=2.0.7",
+  "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4.3",
+  "pytest-asyncio>=0.21.1",
+  "pytest-cov>=4.1.0",
+  "httpx>=0.25.2",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["talentlens*"]

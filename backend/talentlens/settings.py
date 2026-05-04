@@ -1,0 +1,135 @@
+import os
+from pathlib import Path
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
+
+
+def _find_env_file() -> str:
+    """Search for .env starting from this file's directory and walking up."""
+    current = Path(__file__).resolve().parent
+    for _ in range(5):
+        candidate = current / ".env"
+        if candidate.is_file():
+            return str(candidate)
+        current = current.parent
+    return ".env"  # Fall back to CWD
+
+
+class Settings(BaseSettings):
+    # Database
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "postgresql://postgres:password@localhost:5432/hr_ranking_db"
+    )
+    
+    # Debug
+    DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
+    
+    # Email Service — Legacy SMTP (for self-hosted deployments)
+    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
+
+    # Platform Email — Resend (for SaaS mode, zero-config for HR users)
+    # Sign up free at https://resend.com — 3,000 emails/month free tier
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    PLATFORM_FROM_EMAIL: str = os.getenv("PLATFORM_FROM_EMAIL", "TalentLens <notifications@talentlens.app>")
+    PLATFORM_COMPANY_NAME: str = os.getenv("PLATFORM_COMPANY_NAME", "TalentLens")
+    
+    # Application
+    APP_NAME: str = "HR Ranking System"
+    APP_VERSION: str = "1.0.0"
+    
+    # GitHub Scraping
+    GITHUB_SCRAPE_TIMEOUT: int = int(os.getenv("GITHUB_SCRAPE_TIMEOUT", "10"))
+    GITHUB_FALLBACK_API: str = "https://githubrepoanalyser.netlify.app/"
+
+    # Local LLM Providers
+    LOCAL_LLM_TIMEOUT_SECONDS: int = int(os.getenv("LOCAL_LLM_TIMEOUT_SECONDS", "45"))
+    LOCAL_LLM_DEFAULT_MODEL: str = os.getenv("LOCAL_LLM_DEFAULT_MODEL", "")
+    LOCAL_LLM_TEMPERATURE: float = float(os.getenv("LOCAL_LLM_TEMPERATURE", "0.1"))
+    LOCAL_LLM_EXTRA_MODELS: str = os.getenv("LOCAL_LLM_EXTRA_MODELS", "[]")
+
+    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    GOOGLE_LOCAL_BASE_URL: str = os.getenv("GOOGLE_LOCAL_BASE_URL", "http://127.0.0.1:8001")
+    
+    # Cloud API Keys (from .env — these are server-level defaults only).
+    # HRs can also supply keys per-session via the frontend; those ephemeral
+    # keys are NEVER stored, logged, or persisted by the backend.
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    
+    # Security
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    # CORS
+    ALLOWED_ORIGINS: list = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:7860",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:7860",
+        "https://*.hf.space",
+    ]
+
+    class Config:
+        env_file = _find_env_file()
+        case_sensitive = True
+        extra = "ignore"
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def normalize_debug(cls, value):
+        if isinstance(value, bool):
+            return value
+        normalized = str(value).strip().lower()
+        return normalized in {"1", "true", "yes", "on", "debug"}
+
+
+def get_api_key_for_provider(provider_id: str, ephemeral_keys: dict | None = None) -> str:
+    """
+    Return the API key for a given provider.
+
+    Priority order:
+    1. Ephemeral key supplied by the HR user for this session (never stored).
+    2. Server-level key from the .env file.
+    """
+    key_mapping = {
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "google": "GEMINI_API_KEY",
+        "groq": "GROQ_API_KEY",
+    }
+    env_attr = key_mapping.get(provider_id)
+    if not env_attr:
+        return ""
+
+    # Check ephemeral key first (supplied per-session by HR, never persisted)
+    if ephemeral_keys and ephemeral_keys.get(env_attr):
+        return ephemeral_keys[env_attr]
+
+    # Fall back to server-level key
+    return getattr(settings, env_attr, "")
+
+
+def validate_api_keys(settings_obj: "Settings", provider_id: str, ephemeral_keys: dict | None = None):
+    """Manual check for API keys based on provider."""
+    if provider_id in ("builtin", "ollama"):
+        return  # No API key needed
+
+    key = get_api_key_for_provider(provider_id, ephemeral_keys)
+    if not key:
+        raise ValueError(
+            f"No API key available for {provider_id}. "
+            f"Please enter your key in the Settings panel, or use the free built-in engine."
+        )
+
+
+settings = Settings()
