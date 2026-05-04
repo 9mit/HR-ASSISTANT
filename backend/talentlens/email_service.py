@@ -159,8 +159,14 @@ class EmailService:
             # Build the from address: use HR name if provided
             from_addr = self.platform_from_email
             if from_name:
-                # e.g. "Priya Sharma via TalentLens <notifications@talentlens.app>"
-                from_addr = f"{from_name} via TalentLens <notifications@talentlens.app>"
+                # Dynamically extract the email address part from the configured platform email
+                if "<" in self.platform_from_email and ">" in self.platform_from_email:
+                    email_part = self.platform_from_email[self.platform_from_email.find("<"):self.platform_from_email.find(">")+1]
+                else:
+                    email_part = f"<{self.platform_from_email}>"
+                
+                # e.g. "Priya Sharma via TalentLens <onboarding@resend.dev>"
+                from_addr = f"{from_name} via {self.platform_company_name} {email_part}"
 
             payload: dict = {
                 "from": from_addr,
