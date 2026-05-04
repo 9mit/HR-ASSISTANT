@@ -177,30 +177,31 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
                   </div>
                   
                   {candidate.stored_file ? (
-                    candidate.file_name.toLowerCase().endsWith('.docx') ? (
-                      <div className="flex-1 flex flex-col items-center justify-center bg-zinc-900/50 border border-zinc-800 rounded-2xl p-8 text-center">
-                        <FileText className="w-16 h-16 text-zinc-600 mb-4" />
-                        <h4 className="text-lg font-medium text-zinc-300 mb-2">DOCX Preview Not Supported</h4>
-                        <p className="text-zinc-500 text-sm max-w-md mb-6">
-                          Browsers do not natively support previewing Word documents. Please download the file to view it.
-                        </p>
+                    <div className="flex-1 flex flex-col items-center justify-center bg-stone-900/50 border border-stone-800 rounded-2xl p-8 text-center">
+                      <FileText className="w-16 h-16 text-emerald-500/50 mb-4" />
+                      <h4 className="text-lg font-medium text-stone-200 mb-2">Resume Document</h4>
+                      <p className="text-stone-400 text-sm max-w-md mb-8">
+                        For security reasons, Chrome blocks inline document previewing in sandboxed cloud environments. 
+                        Please open or download the file to view it safely.
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <a 
+                          href={`${apiUrl}/uploads/${candidate.stored_file}`} 
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-6 py-3 bg-stone-800 hover:bg-stone-700 text-stone-100 font-medium rounded-xl transition-colors shadow-lg"
+                        >
+                          Open in New Tab
+                        </a>
                         <a 
                           href={`${apiUrl}/uploads/${candidate.stored_file}`} 
                           download={candidate.file_name}
                           className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/20"
                         >
-                          Download {candidate.file_name}
+                          Download {candidate.file_name.split('.').pop()?.toUpperCase() || 'File'}
                         </a>
                       </div>
-                    ) : (
-                      <div className="flex-1 bg-stone-100 rounded-2xl overflow-hidden border border-stone-800">
-                        <iframe 
-                          src={`${apiUrl}/uploads/${candidate.stored_file}`} 
-                          className="w-full h-full min-h-[600px] border-0"
-                          title="Resume Preview"
-                        />
-                      </div>
-                    )
+                    </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center bg-stone-900/50 border border-stone-800 rounded-2xl p-8 text-center">
                       <p className="text-stone-500">Resume file is not available for preview.</p>
