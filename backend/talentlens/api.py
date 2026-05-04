@@ -1,6 +1,8 @@
 """FastAPI application and REST endpoints."""
 import logging
 import os
+import asyncio
+import httpx
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, BackgroundTasks, APIRouter, Form, Header
@@ -44,6 +46,18 @@ from .utils import compact_whitespace, unique_preserve_order
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+async def keep_awake():
+    """Genius background task to trick Hugging Face into staying awake 24/7."""
+    url = "https://spidercraft01-hr-assistant.hf.space/api/health"
+    async with httpx.AsyncClient() as client:
+        while True:
+            try:
+                await client.get(url, timeout=10.0)
+                logger.info("Anti-sleep ping successful")
+            except Exception as e:
+                pass
+            await asyncio.sleep(600)  # Ping every 10 minutes
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -54,8 +68,14 @@ async def lifespan(app: FastAPI):
     # Initialize database on startup
     init_db()
     logger.info("Database initialized successfully")
+    
+    # Start the 24/7 anti-sleep script
+    task = asyncio.create_task(keep_awake())
+    
     yield
+    
     logger.info("Shutting down TalentLens API...")
+    task.cancel()
 
 # Initialize FastAPI app
 app = FastAPI(
