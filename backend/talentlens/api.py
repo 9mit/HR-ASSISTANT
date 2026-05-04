@@ -17,7 +17,6 @@ from .settings import settings, validate_api_keys
 from .schemas import (
     SetTargetRequest,
     SendRejectionsRequest,
-    SendEmailRequest, 
     ApiMessage,
     GitHubAnalysis,
     GitHubRepo,
@@ -37,7 +36,6 @@ from .models import Batch, Candidate, RankingDecision, Ranking, Email, Note
 from .parser import ResumeParser, COMMON_SKILLS
 from .scraper import GitHubScraper
 from .ranking import RankingEngine, extract_resume_projects, generate_interview_questions
-from .email_service import EmailService
 from .audit import AuditService
 from .llm_service import LLMService, LLMAnalysis, BUILTIN_MODEL_ID
 from .utils import compact_whitespace, unique_preserve_order
@@ -101,7 +99,6 @@ api_router = APIRouter(prefix="/api")
 resume_parser = ResumeParser()
 github_scraper = GitHubScraper()
 ranking_engine = RankingEngine()
-email_service = EmailService()
 audit_service = AuditService()
 llm_service = LLMService()
 
@@ -189,14 +186,7 @@ async def health_check() -> dict[str, Any]:
         "status": "healthy",
         "message": "HR Ranking System is running",
         "version": settings.APP_VERSION,
-        "smtp_configured": email_service.is_configured(),
     }
-
-
-@api_router.get("/email-status")
-async def email_status() -> dict[str, Any]:
-    """Return email configuration status (Resend or SMTP) for the frontend."""
-    return email_service.get_email_status()
 
 
 @api_router.get("/local-models", response_model=LocalModelCatalogResponse)
@@ -468,41 +458,28 @@ async def _run_candidate_pipeline(
                         notes=audit_raw.get("fairness_flags", []),
                     )
                 
-                # 7. Auto-send emails OR build drafts
+                # 7. Generate email drafts for client-side mailto links
                 comm_response = None
-                if auto_send_emails and decision_value in ("shortlist", "rejected", "review", "needs_clarification"):
-                    # AUTO-SEND: The platform sends the email automatically
-                    try:
-                        email_result = email_service.send_auto_email(
+                
+                # Built-in templates for client-side drafting
+                templates = {
+                    "shortlist": {"subject": "Congratulations! Your Application for {job_title}", "body": "Dear {candidate_name},\n\nCongratulations! We are pleased to inform you that your application for the {job_title} position at {company_name} has been selected to move forward in our hiring process.\n\nWe were impressed by your background and qualifications. Our hiring team would like to schedule a discussion to learn more about your experience and explore how you could contribute to our team.\n\nPlease reply to this email with your availability for a call in the coming week.\n\nBest regards,\n{company_name} Hiring Team"},
+                    "review": {"subject": "Application Update — {job_title}", "body": "Dear {candidate_name},\n\nThank you for applying for the {job_title} position at {company_name}. Your application is currently under review by our hiring team.\n\nWe will be in touch with next steps within the next 2 weeks.\n\nBest regards,\n{company_name} Hiring Team"},
+                    "rejected": {"subject": "Your Application for {job_title}", "body": "Dear {candidate_name},\n\nThank you for your interest in the {job_title} position at {company_name}. After careful consideration of your application, we have decided to move forward with other candidates whose qualifications more closely match our current needs.\n\nWe appreciate the time you invested in our process and encourage you to apply for future openings that align with your skills and experience.\n\nBest regards,\n{company_name} Hiring Team"},
+                    "needs_clarification": {"subject": "Additional Information Needed — {job_title}", "body": "Dear {candidate_name},\n\nThank you for your interest in the {job_title} position at {company_name}. We would like to clarify a few details from your application before proceeding with our evaluation.\n\nCould you please provide the following information:\n- Your current salary expectations\n- Availability for the role\n\nPlease reply to this email with this information.\n\nBest regards,\n{company_name} Hiring Team"}
+                }
+                
+                if decision_value in templates:
+                    tmpl = templates[decision_value]
+                    comm_response = CandidateCommunication(
+                        subject=tmpl["subject"].format(job_title=role),
+                        body=tmpl["body"].format(
                             candidate_name=candidate.name or candidate.alias,
-                            candidate_email=candidate.email or "",
-                            candidate_id=candidate.id,
-                            decision=decision_value,
                             job_title=role,
-                            company_name=company_name,
-                            hr_email=hr_email,
-                            hr_name=hr_name,
-                            db=db,
-                        )
-                        comm_response = CandidateCommunication(
-                            subject=email_result.get("subject", ""),
-                            body=email_result.get("body", ""),
-                            status=email_result.get("status", "draft"),
-                        )
-                    except Exception as email_err:
-                        logger.warning(f"Auto-send failed for {candidate.alias}: {email_err}")
-                elif decision_value == "rejected":
-                    # MANUAL MODE: Build draft for HR to review and send later
-                    try:
-                        email_raw = email_service.send_rejection_email(candidate, db)
-                        if email_raw and isinstance(email_raw, dict) and "error" not in email_raw:
-                            comm_response = CandidateCommunication(
-                                subject=email_raw.get("subject", ""),
-                                body=email_raw.get("body", ""),
-                                status=email_raw.get("status", "draft"),
-                            )
-                    except Exception as email_err:
-                        logger.warning(f"Rejection draft failed for {candidate.alias}: {email_err}")
+                            company_name=company_name or "Our Company"
+                        ),
+                        status="draft",
+                    )
 
                 # 7b. Generate interview questions locally (no external API)
                 interview_questions = (
@@ -658,31 +635,7 @@ async def save_note(request: SaveNotesRequest, db: Session = Depends(get_db)) ->
         raise HTTPException(status_code=500, detail="Failed to save note")
 
 
-@api_router.post("/send-email")
-async def send_email(request: SendEmailRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
-    """
-    Send an email to a candidate. Actually dispatches via SMTP if configured,
-    otherwise saves as a draft.
-    """
-    try:
-        c_id = int(request.candidate_id)
-        result = email_service.send_custom_email(
-            candidate_id=c_id,
-            recipient_email=request.email or "unknown@example.com",
-            subject=request.subject,
-            body=request.body,
-            db=db,
-        )
-        return result
-    except Exception as e:
-        logger.error(f"Error sending email: {str(e)}")
-        raise HTTPException(status_code=500, detail="Mail server unreachable")
 
-
-@api_router.get("/email-status")
-async def email_status() -> dict[str, Any]:
-    """Return email provider configuration status for the frontend."""
-    return email_service.get_email_status()
 
 
 @api_router.get("/export-candidates/{batch_id}")

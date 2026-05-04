@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Database, ScanSearch, Scale, ShieldCheck, Sparkles, Settings, Activity, AlertCircle, CheckCircle2, XCircle, Cpu, Loader2, Key, Eye, EyeOff, Mail, Download } from 'lucide-react';
-import { BatchSummary, Candidate, EphemeralKeys, EmailStatus, LocalModelOption, ProcessResponse } from './types';
+import { BatchSummary, Candidate, EphemeralKeys, LocalModelOption, ProcessResponse } from './types';
 import { UploadPanel } from './components/UploadPanel';
 import { CandidateTable } from './components/CandidateTable';
 import { CandidateProfile } from './components/CandidateProfile';
@@ -46,7 +46,6 @@ export default function App() {
   // Ephemeral API keys — stored in memory only, never persisted
   const [ephemeralKeys, setEphemeralKeys] = useState<EphemeralKeys>({});
   const [keyVisibility, setKeyVisibility] = useState<Record<string, boolean>>({});
-  const [emailStatus, setEmailStatus] = useState<EmailStatus | null>(null);
 
   // HR Identity — for email automation
   const [hrEmail, setHrEmail] = useState('');
@@ -99,20 +98,7 @@ export default function App() {
     void loadModels();
   }, [apiUrl, ephemeralHeader]);
 
-  // Load email provider status
-  useEffect(() => {
-    const loadEmailStatus = async () => {
-      try {
-        const response = await fetch(`${apiUrl}/api/email-status`);
-        if (response.ok) {
-          setEmailStatus(await response.json());
-        }
-      } catch {
-        // Backend may not be running
-      }
-    };
-    void loadEmailStatus();
-  }, [apiUrl]);
+
 
   const removeFile = (index: number) => {
     setFiles((current) => current.filter((_, i) => i !== index));
@@ -420,26 +406,7 @@ export default function App() {
               </div>
 
               <div className="space-y-6">
-                {/* Email Automation Status */}
-                <div className={`rounded-2xl border p-5 ${emailStatus?.configured ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-amber-500/20 bg-amber-500/5'}`}>
-                  <h3 className="flex items-center gap-2 text-sm font-medium text-stone-200">
-                    <Mail className={`h-4 w-4 ${emailStatus?.configured ? 'text-emerald-400' : 'text-amber-400'}`} />
-                    Email Automation: {emailStatus?.configured ? 'Active' : 'Not Configured'}
-                  </h3>
-                  <p className="mt-2 text-xs leading-relaxed text-stone-400">
-                    {emailStatus?.note || 'Checking automation status...'}
-                  </p>
-                  {emailStatus?.configured && emailStatus.provider === 'smtp' && (
-                    <p className="mt-1 text-xs text-stone-500">
-                      SMTP Server: {emailStatus.server}:{emailStatus.port} | From: {emailStatus.from_email}
-                    </p>
-                  )}
-                  {emailStatus?.configured && emailStatus.provider === 'resend' && (
-                    <p className="mt-1 text-xs text-stone-500">
-                      Using SaaS Mode (Resend) | Verified Domain Active
-                    </p>
-                  )}
-                </div>
+
 
                 {/* API Keys — Ephemeral, masked, never stored */}
                 <div>
