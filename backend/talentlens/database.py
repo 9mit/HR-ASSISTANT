@@ -70,6 +70,27 @@ def get_db():
 
 
 def init_db():
-    """Initialize database tables."""
+    """Initialize database tables and run simple migrations."""
     Base.metadata.create_all(bind=engine)
+    
+    # Simple migration to add raw_record column if it doesn't exist
+    # This is needed because HF Spaces might have an existing SQLite file from previous versions
+    try:
+        with engine.connect() as conn:
+            # Check if candidates table has raw_record (SQLite specific check)
+            # For PostgreSQL it might fail but that's handled by the try/except
+            try:
+                result = conn.execute(text("PRAGMA table_info(candidates)"))
+                columns = [row[1] for row in result.fetchall()]
+                if columns and "raw_record" not in columns:
+                    logger.info("Migrating: Adding raw_record column to candidates table")
+                    # Use a transaction-safe way if possible, or just raw SQL
+                    conn.execute(text("ALTER TABLE candidates ADD COLUMN raw_record JSON"))
+                    # conn.commit() # SQLite in autocommit mode usually doesn't need this for DDL
+            except Exception:
+                # If PRAGMA fails, might be Postgres or table doesn't exist
+                pass
+    except Exception as e:
+        logger.warning(f"Migration check skipped: {e}")
+
     logger.info("Database tables initialized")
