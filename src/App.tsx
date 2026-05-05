@@ -6,6 +6,9 @@ import { UploadPanel } from './components/UploadPanel';
 import { CandidateTable } from './components/CandidateTable';
 import { CandidateProfile } from './components/CandidateProfile';
 
+import { PoolPanel } from './components/PoolPanel';
+import { RejectedPanel } from './components/RejectedPanel';
+
 const summaryCards = (summary: BatchSummary | null) => {
   if (!summary) return [];
 
@@ -42,6 +45,7 @@ export default function App() {
   const [modelError, setModelError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isValidatingMock, setIsValidatingMock] = useState(false);
+  const [activeTab, setActiveTab] = useState<'batch' | 'pool' | 'rejected'>('batch');
 
   // Ephemeral API keys — stored in memory only, never persisted
   const [ephemeralKeys, setEphemeralKeys] = useState<EphemeralKeys>({});
@@ -283,93 +287,126 @@ export default function App() {
           </div>
         </section>
 
-        <UploadPanel 
-          role={role}
-          setRole={setRole}
-          salaryMin={salaryMin}
-          setSalaryMin={setSalaryMin}
-          salaryMax={salaryMax}
-          setSalaryMax={setSalaryMax}
-          files={files}
-          setFiles={setFiles}
-          availableModels={availableModels}
-          selectedModelId={selectedModelId}
-          setSelectedModelId={setSelectedModelId}
-          isLoadingModels={isLoadingModels}
-          modelError={modelError}
-          isProcessing={isProcessing}
-          processResumes={processResumes}
-          removeFile={removeFile}
-          hrEmail={hrEmail}
-          setHrEmail={setHrEmail}
-          hrName={hrName}
-          setHrName={setHrName}
-          companyName={companyName}
-          setCompanyName={setCompanyName}
-          autoSendEmails={autoSendEmails}
-          setAutoSendEmails={setAutoSendEmails}
-        />
+        <div className="flex gap-6 border-b border-stone-800">
+          <button 
+            onClick={() => setActiveTab('batch')}
+            className={`pb-4 text-sm font-medium transition-all ${activeTab === 'batch' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-stone-500 hover:text-stone-300'}`}
+          >
+            Upload & Active Batch
+          </button>
+          <button 
+            onClick={() => setActiveTab('pool')}
+            className={`pb-4 text-sm font-medium transition-all ${activeTab === 'pool' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-stone-500 hover:text-stone-300'}`}
+          >
+            Under Consideration Pool
+          </button>
+          <button 
+            onClick={() => setActiveTab('rejected')}
+            className={`pb-4 text-sm font-medium transition-all ${activeTab === 'rejected' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-stone-500 hover:text-stone-300'}`}
+          >
+            Rejected Candidates
+          </button>
+        </div>
 
-        {error && (
-          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
-            {error}
+        {activeTab === 'batch' && (
+          <div className="flex flex-col gap-10">
+            <UploadPanel 
+              role={role}
+              setRole={setRole}
+              salaryMin={salaryMin}
+              setSalaryMin={setSalaryMin}
+              salaryMax={salaryMax}
+              setSalaryMax={setSalaryMax}
+              files={files}
+              setFiles={setFiles}
+              availableModels={availableModels}
+              selectedModelId={selectedModelId}
+              setSelectedModelId={setSelectedModelId}
+              isLoadingModels={isLoadingModels}
+              modelError={modelError}
+              isProcessing={isProcessing}
+              processResumes={processResumes}
+              removeFile={removeFile}
+              hrEmail={hrEmail}
+              setHrEmail={setHrEmail}
+              hrName={hrName}
+              setHrName={setHrName}
+              companyName={companyName}
+              setCompanyName={setCompanyName}
+              autoSendEmails={autoSendEmails}
+              setAutoSendEmails={setAutoSendEmails}
+            />
+
+            {error && (
+              <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
+                {error}
+              </div>
+            )}
+
+            {summary && (
+              <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {summaryCards(summary).map((card) => (
+                    <div
+                      key={card.label}
+                      className="rounded-2xl border border-stone-800 bg-stone-950/80 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.2)]"
+                    >
+                      <p className="text-sm uppercase tracking-[0.18em] text-stone-500">{card.label}</p>
+                      <p className="mt-2 font-display text-4xl font-semibold text-stone-50">{card.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-2xl border border-stone-800 bg-stone-950/80 p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-stone-500">Batch summary</p>
+                      <h2 className="mt-2 font-display text-2xl font-semibold text-stone-50">{summary.role}</h2>
+                      <p className="mt-2 text-sm text-stone-500">Processed with {summary.selected_model_label || summary.model_backend}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {batchId && (
+                        <a
+                          href={`${apiUrl}/api/export-candidates/${batchId}`}
+                          download
+                          className="flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-300 transition-all hover:bg-cyan-500/20 hover:border-cyan-400/40"
+                        >
+                          <Download className="h-4 w-4" />
+                          Export CSV
+                        </a>
+                      )}
+                      <div className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300">
+                        {summary.salary_range.minimum.toLocaleString()} - {summary.salary_range.maximum.toLocaleString()} {summary.salary_range.currency}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    {summary.fairness_highlights.map((highlight, index) => (
+                      <div key={index} className="rounded-2xl border border-stone-800 bg-stone-900/70 px-4 py-3 text-sm text-stone-300">
+                        {highlight}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {candidates.length > 0 && (
+              <CandidateTable 
+                candidates={candidates}
+                onSelect={setSelectedCandidate}
+              />
+            )}
           </div>
         )}
 
-        {summary && (
-          <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="grid gap-4 sm:grid-cols-2">
-              {summaryCards(summary).map((card) => (
-                <div
-                  key={card.label}
-                  className="rounded-2xl border border-stone-800 bg-stone-950/80 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.2)]"
-                >
-                  <p className="text-sm uppercase tracking-[0.18em] text-stone-500">{card.label}</p>
-                  <p className="mt-2 font-display text-4xl font-semibold text-stone-50">{card.value}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="rounded-2xl border border-stone-800 bg-stone-950/80 p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-stone-500">Batch summary</p>
-                  <h2 className="mt-2 font-display text-2xl font-semibold text-stone-50">{summary.role}</h2>
-                  <p className="mt-2 text-sm text-stone-500">Processed with {summary.selected_model_label || summary.model_backend}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {batchId && (
-                    <a
-                      href={`${apiUrl}/api/export-candidates/${batchId}`}
-                      download
-                      className="flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-300 transition-all hover:bg-cyan-500/20 hover:border-cyan-400/40"
-                    >
-                      <Download className="h-4 w-4" />
-                      Export CSV
-                    </a>
-                  )}
-                  <div className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300">
-                    {summary.salary_range.minimum.toLocaleString()} - {summary.salary_range.maximum.toLocaleString()} {summary.salary_range.currency}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {summary.fairness_highlights.map((highlight, index) => (
-                  <div key={index} className="rounded-2xl border border-stone-800 bg-stone-900/70 px-4 py-3 text-sm text-stone-300">
-                    {highlight}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+        {activeTab === 'pool' && (
+          <PoolPanel onSelectCandidate={setSelectedCandidate} />
         )}
 
-        {candidates.length > 0 && (
-          <CandidateTable 
-            candidates={candidates}
-            onSelect={setSelectedCandidate}
-          />
+        {activeTab === 'rejected' && (
+          <RejectedPanel onSelectCandidate={setSelectedCandidate} />
         )}
       </main>
 

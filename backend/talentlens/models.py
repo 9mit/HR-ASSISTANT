@@ -13,6 +13,7 @@ class RankingDecision(str, PyEnum):
     REVIEW = "review"
     REJECTED = "rejected"
     NEEDS_CLARIFICATION = "needs_clarification"
+    UNDER_CONSIDERATION = "under_consideration"
 
 
 class Candidate(Base):
@@ -32,6 +33,9 @@ class Candidate(Base):
     experience = Column(JSON, nullable=True)
     skills = Column(JSON, nullable=True)
     certifications = Column(JSON, nullable=True)
+    
+    # Cache for the full frontend record
+    raw_record = Column(JSON, nullable=True)
     
     # GitHub/Portfolio
     github_url = Column(String(255), nullable=True)

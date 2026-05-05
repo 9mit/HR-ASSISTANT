@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Candidate } from '../types';
-import { XCircle, Github, ShieldCheck, FileText, Mail, User, Briefcase, GraduationCap, AlertCircle, StickyNote } from 'lucide-react';
+import { XCircle, Github, ShieldCheck, FileText, Mail, User, Briefcase, GraduationCap, AlertCircle, StickyNote, Loader2 } from 'lucide-react';
 import { AuditLog } from './AuditLog';
 import { EmailPanel } from './EmailPanel';
 import { NotesPanel } from './NotesPanel';
@@ -16,7 +16,27 @@ type Tab = 'overview' | 'resume' | 'audit' | 'github' | 'email' | 'notes';
 
 export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: CandidateProfileProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [isMoving, setIsMoving] = useState(false);
   const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
+
+  const handleMoveToPool = async () => {
+    setIsMoving(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/candidates/${candidate.id}/decision`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'under_consideration' })
+      });
+      if (!response.ok) throw new Error('Failed to update decision');
+      const updatedCandidate = { ...candidate, decision: 'under_consideration' };
+      onUpdateCandidate(updatedCandidate);
+      alert('Candidate moved to Under Consideration pool!');
+    } catch (e) {
+      alert('Error moving candidate to pool.');
+    } finally {
+      setIsMoving(false);
+    }
+  };
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
@@ -57,12 +77,23 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
               )}
             </div>
           </div>
-          <button 
-            onClick={onClose} 
-            className="text-stone-500 hover:text-stone-300 bg-stone-800/50 hover:bg-stone-800 p-2 rounded-full transition-all"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-3">
+            {candidate.decision !== 'under_consideration' && candidate.decision !== 'shortlist' && (
+              <button 
+                onClick={handleMoveToPool}
+                disabled={isMoving}
+                className="bg-stone-100 hover:bg-white text-stone-950 px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 shadow-lg disabled:opacity-50"
+              >
+                {isMoving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Move to Pool'}
+              </button>
+            )}
+            <button 
+              onClick={onClose} 
+              className="text-stone-500 hover:text-stone-300 bg-stone-800/50 hover:bg-stone-800 p-2 rounded-full transition-all"
+            >
+              <XCircle className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}

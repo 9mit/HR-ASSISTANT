@@ -17,6 +17,8 @@ from .settings import settings, validate_api_keys
 from .schemas import (
     SetTargetRequest,
     SendRejectionsRequest,
+    SetDecisionRequest,
+    FinalizePoolRequest,
     ApiMessage,
     GitHubAnalysis,
     GitHubRepo,
@@ -533,6 +535,10 @@ async def _run_candidate_pipeline(
                     audit=audit_response,
                     communication=comm_response,
                 )
+                
+                # Cache the fully built record in the DB for the Talent Pool
+                candidate.raw_record = record.model_dump(mode="json")
+                
                 candidates_list.append(record)
                 processed_count += 1
                 
@@ -636,6 +642,53 @@ async def save_note(request: SaveNotesRequest, db: Session = Depends(get_db)) ->
 
 
 
+
+
+@api_router.put("/candidates/{candidate_id}/decision")
+async def update_decision(candidate_id: int, request: SetDecisionRequest, db: Session = Depends(get_db)):
+    """Update a candidate's decision state (e.g. move to under consideration)."""
+    candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    candidate.decision = request.decision
+    if candidate.raw_record:
+        rec = candidate.raw_record.copy()
+        rec["decision"] = request.decision
+        candidate.raw_record = rec
+        
+    db.commit()
+    return {"success": True, "decision": request.decision}
+
+
+@api_router.get("/pool/candidates")
+async def get_pool_candidates(decision: str, db: Session = Depends(get_db)):
+    """Fetch candidates from the global pool by their current decision."""
+    candidates = db.query(Candidate).filter(Candidate.decision == decision).order_by(Candidate.score.desc()).all()
+    records = []
+    for c in candidates:
+        if c.raw_record:
+            rec = c.raw_record.copy()
+            rec["decision"] = c.decision
+            records.append(rec)
+    return records
+
+
+@api_router.post("/pool/finalize")
+async def finalize_pool(request: FinalizePoolRequest, db: Session = Depends(get_db)):
+    """Finalize the pool: shortlist selected IDs, reject all other under_consideration candidates."""
+    pool = db.query(Candidate).filter(Candidate.decision == "under_consideration").all()
+    
+    for c in pool:
+        new_dec = "shortlist" if str(c.id) in request.shortlisted_ids else "rejected"
+        c.decision = new_dec
+        if c.raw_record:
+            rec = c.raw_record.copy()
+            rec["decision"] = new_dec
+            c.raw_record = rec
+            
+    db.commit()
+    return {"success": True, "message": f"Shortlisted {len(request.shortlisted_ids)} candidates. Rejected the rest."}
 
 
 @api_router.get("/export-candidates/{batch_id}")

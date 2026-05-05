@@ -14,9 +14,10 @@ class RankingDecision(str, PyEnum):
     NEEDS_CLARIFICATION = "needs_clarification"
     SALARY_MISMATCH = "salary_mismatch"
     INVALID = "invalid"
+    UNDER_CONSIDERATION = "under_consideration"
 
 
-Decision = Literal["shortlist", "review", "rejected", "needs_clarification", "salary_mismatch", "invalid"]
+Decision = Literal["shortlist", "review", "rejected", "needs_clarification", "salary_mismatch", "invalid", "under_consideration"]
 SalaryStatus = Literal["within_range", "missing_expectation", "out_of_range", "unknown"]
 
 
@@ -32,12 +33,14 @@ class SetTargetRequest(BaseModel):
     preferred_skills: Optional[List[str]] = Field(None, description="Preferred skills")
 
 
-class SendRejectionsRequest(BaseModel):
-    """Schema for sending rejection emails."""
-    batch_id: int = Field(..., description="Batch ID")
-    candidate_ids: List[int] = Field(..., description="List of candidate IDs to reject")
-    template: str = Field("default", description="Email template name")
-    send_now: bool = Field(False, description="Send immediately or queue")
+class SetDecisionRequest(BaseModel):
+    """Schema for updating a candidate's decision."""
+    decision: Decision = Field(..., description="The new decision state")
+
+
+class FinalizePoolRequest(BaseModel):
+    """Schema for finalizing the Talent Pool."""
+    shortlisted_ids: List[str] = Field(..., description="List of string candidate IDs to shortlist")
 
 
 class SaveNoteRequest(BaseModel):
