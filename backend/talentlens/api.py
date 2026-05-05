@@ -1,4 +1,4 @@
-"""FastAPI application and REST endpoints."""
+"""FastAPI application and REST endpoints. [REBUILD TRIGGER]"""
 import logging
 import os
 import asyncio
@@ -16,7 +16,6 @@ from .database import get_db, init_db
 from .settings import settings, validate_api_keys
 from .schemas import (
     SetTargetRequest,
-    SendRejectionsRequest,
     SetDecisionRequest,
     FinalizePoolRequest,
     ApiMessage,
