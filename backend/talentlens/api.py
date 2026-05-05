@@ -663,14 +663,19 @@ async def update_decision(candidate_id: int, request: SetDecisionRequest, db: Se
 @api_router.get("/pool/candidates")
 async def get_pool_candidates(decision: str, db: Session = Depends(get_db)):
     """Fetch candidates from the global pool by their current decision."""
-    candidates = db.query(Candidate).filter(Candidate.decision == decision).order_by(Candidate.score.desc()).all()
-    records = []
-    for c in candidates:
-        if c.raw_record:
-            rec = c.raw_record.copy()
-            rec["decision"] = c.decision
-            records.append(rec)
-    return records
+    try:
+        candidates = db.query(Candidate).filter(Candidate.decision == decision).order_by(Candidate.score.desc()).all()
+        records = []
+        for c in candidates:
+            if c.raw_record:
+                rec = c.raw_record.copy()
+                # Ensure decision is synced
+                rec["decision"] = c.decision
+                records.append(rec)
+        return records
+    except Exception as e:
+        logger.error(f"Error fetching pool candidates: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @api_router.post("/pool/finalize")
