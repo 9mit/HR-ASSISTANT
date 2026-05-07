@@ -1,7 +1,7 @@
 """Audit and fairness logging service."""
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from .models import AuditLog, Candidate
@@ -236,7 +236,7 @@ class AuditService:
         
         # Parse step
         logs.append({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "step": "parse_resume",
             "status": "completed",
             "details": f"Resume parsed. Fields redacted: {', '.join(redacted_fields)}",
@@ -244,7 +244,7 @@ class AuditService:
         
         # Scoring step
         logs.append({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "step": "scoring",
             "status": "completed",
             "details": f"Candidate scored with {ranking_result.get('overall_score', 0):.1f}%",
@@ -254,7 +254,7 @@ class AuditService:
         decision = ranking_result.get("decision")
         decision_val = decision.value if hasattr(decision, "value") else str(decision)
         logs.append({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "step": "decision",
             "status": "completed",
             "details": f"Decision: {decision_val} - {ranking_result.get('explanation', 'No explanation')}",
@@ -262,7 +262,7 @@ class AuditService:
         
         # Explanation step
         logs.append({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "step": "explanation",
             "status": "completed",
             "details": "Detailed factor contributions logged for transparency",

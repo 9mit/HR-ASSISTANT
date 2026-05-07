@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Candidate } from '../types';
-import { Loader2, Mail, Users, Send } from 'lucide-react';
+import { Loader2, Mail, Send } from 'lucide-react';
 
 interface RejectedPanelProps {
   onSelectCandidate: (c: Candidate) => void;
@@ -13,7 +13,7 @@ export function RejectedPanel({ onSelectCandidate }: RejectedPanelProps) {
 
   const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
-  const loadRejected = async () => {
+  const loadRejected = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch(`${apiUrl}/api/pool/candidates?decision=rejected`);
@@ -25,11 +25,11 @@ export function RejectedPanel({ onSelectCandidate }: RejectedPanelProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl]);
 
   useEffect(() => {
     loadRejected();
-  }, []);
+  }, [loadRejected]);
 
   const handleMassReject = () => {
     const emails = candidates.map(c => c.email).filter(Boolean).join(',');

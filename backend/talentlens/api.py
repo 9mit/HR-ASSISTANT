@@ -1,16 +1,16 @@
-"""FastAPI application and REST endpoints. [REBUILD TRIGGER]"""
+"""FastAPI application and REST endpoints."""
 import logging
 import os
 import asyncio
 import httpx
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, BackgroundTasks, APIRouter, Form, Header
+from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, APIRouter, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .database import get_db, init_db
 from .settings import settings, validate_api_keys
@@ -45,17 +45,22 @@ from .utils import compact_whitespace, unique_preserve_order
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def keep_awake():
-    """Genius background task to trick Hugging Face into staying awake 24/7."""
-    url = "https://spidercraft01-hr-assistant.hf.space/api/health"
+async def _keep_awake():
+    """Background ping to prevent Hugging Face Spaces from sleeping.
+    Only runs in production (DEBUG=false) to avoid noise during development.
+    """
+    hf_url = os.environ.get("HF_SPACE_HEALTH_URL", "")
+    if not hf_url:
+        return
     async with httpx.AsyncClient() as client:
         while True:
             try:
-                await client.get(url, timeout=10.0)
+                await client.get(hf_url, timeout=10.0)
                 logger.info("Anti-sleep ping successful")
-            except Exception as e:
+            except Exception:
                 pass
             await asyncio.sleep(600)  # Ping every 10 minutes
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,14 +72,17 @@ async def lifespan(app: FastAPI):
     # Initialize database on startup
     init_db()
     logger.info("Database initialized successfully")
-    
-    # Start the 24/7 anti-sleep script
-    task = asyncio.create_task(keep_awake())
-    
+
+    # Start anti-sleep ping only in production
+    task = None
+    if not settings.DEBUG:
+        task = asyncio.create_task(_keep_awake())
+
     yield
-    
+
     logger.info("Shutting down TalentLens API...")
-    task.cancel()
+    if task:
+        task.cancel()
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -575,7 +583,7 @@ async def _run_candidate_pipeline(
             model_backend=chosen_backend_label,
             selected_model_id=selected_model.id,
             selected_model_label=chosen_backend_label,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
             fairness_highlights=fairness_highlights,
         )
         
@@ -628,7 +636,7 @@ async def save_note(request: SaveNotesRequest, db: Session = Depends(get_db)) ->
         note = db.query(Note).filter(Note.candidate_id == c_id).first()
         if note:
             note.content = request.notes
-            note.updated_at = datetime.utcnow()
+            note.updated_at = datetime.now(timezone.utc)
         else:
             note = Note(candidate_id=c_id, content=request.notes)
             db.add(note)
@@ -638,9 +646,6 @@ async def save_note(request: SaveNotesRequest, db: Session = Depends(get_db)) ->
     except Exception as e:
         logger.error(f"Error saving note: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to save note")
-
-
-
 
 
 @api_router.put("/candidates/{candidate_id}/decision")

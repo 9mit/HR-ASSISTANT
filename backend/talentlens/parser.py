@@ -363,7 +363,7 @@ class ResumeParser:
             durations = []
             for start, end in range_matches:
                 start_year = int(start)
-                end_year = datetime.utcnow().year if end.lower() in {"present", "current"} else int(end)
+                end_year = datetime.now().year if end.lower() in {"present", "current"} else int(end)
                 if end_year >= start_year:
                     durations.append(end_year - start_year)
             if durations:

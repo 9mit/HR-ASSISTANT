@@ -71,7 +71,16 @@ def get_db():
 
 def init_db():
     """Initialize database tables and run simple migrations."""
+    logger.info("Initializing database...")
+    # Ensure all models are imported so they are registered in Base.metadata
+    try:
+        from . import models
+        logger.info(f"Registered tables: {Base.metadata.tables.keys()}")
+    except Exception as e:
+        logger.error(f"Error importing models: {e}")
+        
     Base.metadata.create_all(bind=engine)
+    logger.info("Base.metadata.create_all called")
     
     # Robust migration using SQLAlchemy Inspector
     try:

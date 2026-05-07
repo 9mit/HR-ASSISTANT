@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Send, CheckCircle2, Loader2 } from 'lucide-react';
+import React from 'react';
+import { Mail, Send } from 'lucide-react';
 
 interface EmailPanelProps {
   emailContent: string;
@@ -9,7 +8,7 @@ interface EmailPanelProps {
   candidateId: string;
 }
 
-export function EmailPanel({ emailContent, candidateName, candidateEmail }: EmailPanelProps) {
+export function EmailPanel({ emailContent, candidateEmail }: EmailPanelProps) {
   const subject = encodeURIComponent(`Update on your application`);
   const body = encodeURIComponent(emailContent || '');
   const mailtoLink = `mailto:${candidateEmail || ''}?subject=${subject}&body=${body}`;

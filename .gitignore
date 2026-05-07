@@ -69,3 +69,6 @@ Thumbs.db
 *.pem
 *.key
 
+
+# Local Scratch
+backend/scratch/

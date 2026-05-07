@@ -58,7 +58,7 @@ export default function App() {
   const [autoSendEmails, setAutoSendEmails] = useState(false);
   const [batchId, setBatchId] = useState<string | null>(null);
 
-  const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
+  const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
   const ephemeralHeader = serializeKeys(ephemeralKeys);
 
@@ -217,11 +217,13 @@ export default function App() {
               <p className="text-xs uppercase tracking-[0.24em] text-stone-500">Local Candidate Intelligence</p>
             </div>
           </div>
-          <div className="hidden items-center gap-4 md:flex">
-            <div className="flex items-center gap-2 rounded-full border border-stone-800 bg-stone-900/50 px-4 py-2 text-sm">
-              <div className={`h-2 w-2 rounded-full ${activeModel?.status === 'ready' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              <span className="text-stone-400">Active Engine:</span>
-              <span className="font-medium text-stone-200">{activeModel?.label || 'Loading...'}</span>
+          <div className="flex items-center gap-4">
+            <div className="hidden items-center gap-4 md:flex">
+              <div className="flex items-center gap-2 rounded-full border border-stone-800 bg-stone-900/50 px-4 py-2 text-sm">
+                <div className={`h-2 w-2 rounded-full ${activeModel?.status === 'ready' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="text-stone-400">Active Engine:</span>
+                <span className="font-medium text-stone-200">{activeModel?.label || 'Loading...'}</span>
+              </div>
             </div>
             <button 
               onClick={() => setIsSettingsOpen(true)}

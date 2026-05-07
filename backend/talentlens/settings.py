@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import List
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
@@ -16,60 +17,59 @@ def _find_env_file() -> str:
 
 
 class Settings(BaseSettings):
+    """Application settings. Values are loaded automatically from .env by pydantic-settings."""
+
     # Database
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql://postgres:password@localhost:5432/hr_ranking_db"
-    )
-    
+    DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/hr_ranking_db"
+
     # Debug
-    DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
-    
+    DEBUG: bool = False
+
     # Email Service — Legacy SMTP (for self-hosted deployments)
-    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
-    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
+    SMTP_SERVER: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
 
     # Platform Email — Resend (for SaaS mode, zero-config for HR users)
     # Sign up free at https://resend.com — 3,000 emails/month free tier
-    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
-    PLATFORM_FROM_EMAIL: str = os.getenv("PLATFORM_FROM_EMAIL", "TalentLens <notifications@talentlens.app>")
-    PLATFORM_COMPANY_NAME: str = os.getenv("PLATFORM_COMPANY_NAME", "TalentLens")
-    
+    RESEND_API_KEY: str = ""
+    PLATFORM_FROM_EMAIL: str = "TalentLens <notifications@talentlens.app>"
+    PLATFORM_COMPANY_NAME: str = "TalentLens"
+
     # Application
-    APP_NAME: str = "HR Ranking System"
+    APP_NAME: str = "TalentLens"
     APP_VERSION: str = "1.0.0"
-    
+
     # GitHub Scraping
-    GITHUB_SCRAPE_TIMEOUT: int = int(os.getenv("GITHUB_SCRAPE_TIMEOUT", "10"))
+    GITHUB_SCRAPE_TIMEOUT: int = 10
     GITHUB_FALLBACK_API: str = "https://githubrepoanalyser.netlify.app/"
 
     # Local LLM Providers
-    LOCAL_LLM_TIMEOUT_SECONDS: int = int(os.getenv("LOCAL_LLM_TIMEOUT_SECONDS", "45"))
-    LOCAL_LLM_DEFAULT_MODEL: str = os.getenv("LOCAL_LLM_DEFAULT_MODEL", "")
-    LOCAL_LLM_TEMPERATURE: float = float(os.getenv("LOCAL_LLM_TEMPERATURE", "0.1"))
-    LOCAL_LLM_EXTRA_MODELS: str = os.getenv("LOCAL_LLM_EXTRA_MODELS", "[]")
+    LOCAL_LLM_TIMEOUT_SECONDS: int = 45
+    LOCAL_LLM_DEFAULT_MODEL: str = ""
+    LOCAL_LLM_TEMPERATURE: float = 0.1
+    LOCAL_LLM_EXTRA_MODELS: str = "[]"
 
-    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-    GOOGLE_LOCAL_BASE_URL: str = os.getenv("GOOGLE_LOCAL_BASE_URL", "http://127.0.0.1:8001")
-    
+    OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
+    GOOGLE_LOCAL_BASE_URL: str = "http://127.0.0.1:8001"
+
     # Cloud API Keys (from .env — these are server-level defaults only).
     # HRs can also supply keys per-session via the frontend; those ephemeral
     # keys are NEVER stored, logged, or persisted by the backend.
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+
     # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
+
     # CORS
-    ALLOWED_ORIGINS: list = [
+    ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:7860",

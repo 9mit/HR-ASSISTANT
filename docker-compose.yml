@@ -46,20 +46,23 @@ services:
     networks:
       - hr_ranking_network
 
-  # React Frontend
+  # React Frontend (development)
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+    image: node:20-slim
     container_name: hr_ranking_frontend
-    command: npm run dev
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
     ports:
       - "5173:5173"
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     volumes:
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
       - ./src:/app/src
-      - ./public:/app/public
+      - ./index.html:/app/index.html
+      - ./vite.config.ts:/app/vite.config.ts
+      - ./tsconfig.json:/app/tsconfig.json
     networks:
       - hr_ranking_network
 

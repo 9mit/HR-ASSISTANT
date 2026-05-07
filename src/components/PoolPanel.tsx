@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { CandidateTable } from './CandidateTable';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Candidate } from '../types';
 import { Loader2, Users } from 'lucide-react';
 
@@ -16,7 +15,7 @@ export function PoolPanel({ onSelectCandidate }: PoolPanelProps) {
 
   const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
-  const loadPool = async () => {
+  const loadPool = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch(`${apiUrl}/api/pool/candidates?decision=under_consideration`);
@@ -28,11 +27,11 @@ export function PoolPanel({ onSelectCandidate }: PoolPanelProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl]);
 
   useEffect(() => {
     loadPool();
-  }, []);
+  }, [loadPool]);
 
   const toggleShortlist = (id: string) => {
     setShortlistedIds(prev => {

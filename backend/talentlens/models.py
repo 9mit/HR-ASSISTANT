@@ -1,5 +1,5 @@
 """SQLAlchemy ORM models for PostgreSQL."""
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum as PyEnum
 from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, JSON, Text, Enum, Boolean, Index
 from sqlalchemy.orm import relationship
@@ -45,8 +45,8 @@ class Candidate(Base):
     salary_min = Column(Float, nullable=True)
     salary_max = Column(Float, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     batch = relationship("Batch", back_populates="candidates")
@@ -75,8 +75,8 @@ class Batch(Base):
     required_skills = Column(JSON, nullable=True)
     preferred_skills = Column(JSON, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     candidates = relationship("Candidate", back_populates="batch", cascade="all, delete-orphan")
@@ -98,7 +98,7 @@ class Project(Base):
     readme_quality_score = Column(Float, default=0.0)
     commit_frequency = Column(String(50), nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     candidate = relationship("Candidate", back_populates="projects")
@@ -127,7 +127,7 @@ class Ranking(Base):
     decision = Column(String(50), nullable=False)
     explanation = Column(Text, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     candidate = relationship("Candidate", back_populates="rankings")
@@ -157,7 +157,7 @@ class AuditLog(Base):
     log_entries = Column(JSON, nullable=True)
     fairness_flags = Column(JSON, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     candidate = relationship("Candidate", back_populates="audit_logs")
@@ -183,8 +183,8 @@ class Email(Base):
     sent_at = Column(DateTime, nullable=True)
     error_message = Column(Text, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     candidate = relationship("Candidate", back_populates="emails")
@@ -205,8 +205,8 @@ class Note(Base):
     content = Column(Text, nullable=False)
     created_by = Column(String(255), nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     candidate = relationship("Candidate", back_populates="notes")
