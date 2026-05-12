@@ -39,6 +39,7 @@ from .scraper import GitHubScraper
 from .ranking import RankingEngine, extract_resume_projects, generate_interview_questions
 from .audit import AuditService
 from .llm_service import LLMService, LLMAnalysis, BUILTIN_MODEL_ID
+from .email_service import email_service
 from .utils import compact_whitespace, unique_preserve_order
 
 # Configure logging
@@ -489,6 +490,19 @@ async def _run_candidate_pipeline(
                         ),
                         status="draft",
                     )
+                    
+                    # Send email automatically if requested
+                    if auto_send_emails and candidate.email:
+                        email_record = await email_service.send_email(
+                            candidate_id=candidate.id,
+                            recipient_email=candidate.email,
+                            subject=comm_response.subject,
+                            body=comm_response.body,
+                            email_type=decision_value,
+                            db=db
+                        )
+                        if email_record:
+                            comm_response.status = email_record.status
 
                 # 7b. Generate interview questions locally (no external API)
                 interview_questions = (
@@ -554,6 +568,18 @@ async def _run_candidate_pipeline(
                     
             except Exception as fe:
                 logger.error(f"Failed candidate {file.filename}: {str(fe)}")
+                
+                # Add a failed record so the frontend knows this file failed
+                error_record = CandidateRecord(
+                    id=f"failed_{idx}",
+                    alias=f"Failed-{idx + 1:03d}",
+                    score=0.0,
+                    decision="invalid",
+                    file_name=file.filename,
+                    error=str(fe),
+                    summary=f"Failed to process {file.filename}",
+                )
+                candidates_list.append(error_record)
                 continue
 
         db.commit()
@@ -781,5 +807,5 @@ if frontend_build.exists():
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", "7860"))
+    port = int(os.environ.get("PORT", "8000"))
     uvicorn.run(app, host="0.0.0.0", port=port)
