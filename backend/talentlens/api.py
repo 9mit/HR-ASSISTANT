@@ -36,7 +36,13 @@ from .schemas import (
 from .models import Batch, Candidate, RankingDecision, Ranking, Email, Note
 from .parser import ResumeParser, COMMON_SKILLS
 from .scraper import GitHubScraper
-from .ranking import RankingEngine, extract_resume_projects, generate_interview_questions
+from .ranking import (
+    RankingEngine,
+    extract_resume_projects,
+    generate_interview_questions,
+    check_batch_score_uniqueness,
+    generate_score_report,
+)
 from .audit import AuditService
 from .llm_service import LLMService, LLMAnalysis, BUILTIN_MODEL_ID
 from .email_service import email_service
@@ -428,6 +434,8 @@ async def _run_candidate_pipeline(
                     "resume_projects": resume_projects,
                     "certifications": candidate.certifications,
                     "salary_expectation": candidate.salary_min,
+                    "education": parsed_data.education,
+                    "parsed_resume": parsed_data.redacted_text or parsed_data.raw_text,  # For resume quality tiebreaker
                 }
                 
                 ranking_result = ranking_engine.rank_candidate(c_data, job_reqs)
@@ -593,6 +601,37 @@ async def _run_candidate_pipeline(
         ]
         if selected_model.id != BUILTIN_MODEL_ID:
             fairness_highlights.append(f"AI enhanced {local_ai_used_count} of {processed_count} processed resumes.")
+
+        # ========== CRITICAL: BATCH UNIQUENESS VALIDATION ==========
+        # Ensure NO two candidates receive the same score
+        rankings_for_validation = [
+            {
+                "candidate_id": c.alias,
+                "overall_score": c.score,
+                "decision": c.decision,
+            }
+            for c in candidates_list
+            if c.score > 0  # Skip failed records
+        ]
+
+        if rankings_for_validation:
+            uniqueness_check = check_batch_score_uniqueness(rankings_for_validation)
+            score_report = generate_score_report(rankings_for_validation)
+
+            # Update candidate scores if adjustments were made
+            if not uniqueness_check["is_unique"] and uniqueness_check["fixed_rankings"]:
+                score_map = {
+                    r["candidate_id"]: r["overall_score"]
+                    for r in uniqueness_check["fixed_rankings"]
+                }
+                for candidate in candidates_list:
+                    if candidate.alias in score_map:
+                        candidate.score = score_map[candidate.alias]
+
+            # Add uniqueness check report to fairness highlights
+            fairness_highlights.append(f"✓ Score Uniqueness: {uniqueness_check['report']}")
+            
+            logger.info(f"Batch {batch.id} uniqueness check: {uniqueness_check['report']}")
 
         # Sort candidates by score descending before returning
         candidates_list.sort(key=lambda x: x.score, reverse=True)

@@ -119,7 +119,13 @@ def generate_interview_questions(
 
 
 class RankingEngine:
-    """Score and rank candidates based on job requirements."""
+    """Score and rank candidates based on job requirements.
+    
+    UNIQUE SCORING GUARANTEE:
+    - No two resumes receive the same score
+    - Tiebreaker analysis applied to differentiate tied candidates
+    - Consistency checks ensure score uniqueness across batch
+    """
 
     def __init__(self):
         """Initialize ranking engine."""
@@ -127,6 +133,15 @@ class RankingEngine:
         self.project_weight = 0.30
         self.experience_weight = 0.20
         self.certification_weight = 0.10
+        
+        # Tiebreaker weights for deeper differentiation
+        self.tiebreaker_weights = {
+            "portfolio_depth": 0.25,      # Number and variety of projects
+            "certification_depth": 0.20,   # Certifications and education
+            "skill_specialty": 0.20,       # Depth in specialized skills
+            "experience_continuity": 0.15, # Consistency of experience
+            "resume_quality": 0.20,        # Overall resume richness
+        }
 
     def rank_candidate(
         self,
@@ -197,6 +212,9 @@ class RankingEngine:
                     + cert_score * self.certification_weight
                 )
                 result["overall_score"] = overall_score
+                
+                # IMPORTANT: Apply tiebreaker BEFORE returning to ensure uniqueness
+                result = self.apply_uniqueness_tiebreaker(result, candidate_data)
                 return result
 
             # Calculate weighted overall score
@@ -225,6 +243,9 @@ class RankingEngine:
                 "projects": {"score": project_score, "weight": self.project_weight},
                 "certifications": {"score": cert_score, "weight": self.certification_weight},
             }
+
+            # CRITICAL: Apply tiebreaker to ensure NO two candidates get same score
+            result = self.apply_uniqueness_tiebreaker(result, candidate_data)
 
             return result
 
@@ -527,3 +548,236 @@ class RankingEngine:
                 RankingDecision.REJECTED,
                 f"Does not meet minimum threshold ({overall_score:.1f}% overall)",
             )
+
+    def _calculate_tiebreaker_score(self, candidate_data: Dict[str, Any]) -> float:
+        """
+        Calculate a detailed tiebreaker score for differentiating candidates
+        with similar overall scores.
+
+        STRATEGY:
+        - Analyze portfolio depth (# of projects and their diversity)
+        - Evaluate certification depth (# and types of certs/education)
+        - Score skill specialty (depth in specific technical areas)
+        - Check experience continuity (timeline coherence)
+        - Measure resume quality (text richness and detail)
+
+        Returns a decimal value (0-10) that's used as a fractional adjustment
+        to ensure unique scores.
+
+        Args:
+            candidate_data: Full candidate information
+
+        Returns:
+            Tiebreaker adjustment score (0-10)
+        """
+        score = 0.0
+
+        # 1. Portfolio Depth (max 2.5)
+        github_projects = candidate_data.get("projects", [])
+        resume_projects = candidate_data.get("resume_projects", [])
+        total_projects = len(github_projects) + len(resume_projects)
+        portfolio_score = min((total_projects / 8) * 2.5, 2.5)  # Normalize to 2.5
+        score += portfolio_score
+
+        # 2. Certification Depth (max 2.0)
+        certs = candidate_data.get("certifications", [])
+        education = candidate_data.get("education", [])
+        cert_count = (len(certs) if isinstance(certs, list) else (1 if certs else 0))
+        edu_count = (len(education) if isinstance(education, list) else (1 if education else 0))
+        cert_depth_score = min(((cert_count + edu_count) / 5) * 2.0, 2.0)
+        score += cert_depth_score
+
+        # 3. Skill Specialty (max 2.0)
+        skills = candidate_data.get("skills", [])
+        skill_count = len(skills) if isinstance(skills, list) else 0
+        skill_specialty = min((skill_count / 15) * 2.0, 2.0)  # Depth in multiple skills
+        score += skill_specialty
+
+        # 4. Experience Continuity (max 2.0)
+        years = candidate_data.get("experience_years", 0)
+        # Longer continuous experience is valued more
+        continuity_score = min((years / 15) * 2.0, 2.0)
+        score += continuity_score
+
+        # 5. Resume Quality (max 1.5)
+        resume_text = candidate_data.get("parsed_resume", "")
+        resume_length = len(str(resume_text).split())
+        # More detailed resume (more words) = higher quality indication
+        quality_score = min((resume_length / 500) * 1.5, 1.5)
+        score += quality_score
+
+        return round(score, 3)  # Return with 3 decimal precision
+
+    def apply_uniqueness_tiebreaker(
+        self, ranking_result: Dict[str, Any], candidate_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Apply tiebreaker adjustment to ensure score uniqueness.
+
+        Args:
+            ranking_result: Initial ranking result with overall_score
+            candidate_data: Full candidate data for tiebreaker analysis
+
+        Returns:
+            Updated ranking result with adjusted unique score
+        """
+        tiebreaker = self._calculate_tiebreaker_score(candidate_data)
+        
+        # Apply tiebreaker as fractional adjustment (max +0.99 points)
+        adjustment = (tiebreaker / 100) * 0.99
+        adjusted_score = ranking_result["overall_score"] + adjustment
+        
+        # Update the ranking result
+        ranking_result["overall_score"] = round(adjusted_score, 2)
+        ranking_result["tiebreaker_score"] = tiebreaker
+        ranking_result["uniqueness_adjustment"] = adjustment
+        
+        return ranking_result
+
+
+# ──────────────────────────────────────────────────────────────
+# BATCH-LEVEL CONSISTENCY & UNIQUENESS VALIDATION
+# ──────────────────────────────────────────────────────────────
+
+def check_batch_score_uniqueness(rankings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Validate that NO two candidates in a batch have the same score.
+    
+    If duplicates are detected, apply micro-adjustments to ensure uniqueness
+    while preserving the relative ranking order.
+    
+    Args:
+        rankings: List of ranking results from all candidates in batch
+        
+    Returns:
+        Validation result with duplicate count, fixed rankings, and report
+    """
+    if not rankings:
+        return {
+            "is_unique": True,
+            "duplicate_count": 0,
+            "duplicates": [],
+            "fixed_rankings": rankings,
+            "adjustments_made": 0,
+            "report": "No rankings to validate",
+        }
+
+    # Extract scores and find duplicates
+    scores = [r.get("overall_score", 0) for r in rankings]
+    score_counts = {}
+    duplicates = []
+
+    for idx, score in enumerate(scores):
+        if score not in score_counts:
+            score_counts[score] = []
+        score_counts[score].append(idx)
+
+    # Identify duplicate scores
+    for score, indices in score_counts.items():
+        if len(indices) > 1:
+            duplicates.extend(indices)
+
+    # If no duplicates, return as-is
+    if not duplicates:
+        return {
+            "is_unique": True,
+            "duplicate_count": 0,
+            "duplicates": [],
+            "fixed_rankings": rankings,
+            "adjustments_made": 0,
+            "report": f"✓ All {len(rankings)} candidates have unique scores",
+        }
+
+    # Duplicates found — apply micro-adjustments
+    fixed_rankings = [r.copy() for r in rankings]
+    adjustments_made = 0
+
+    # Sort by score descending, then by original index
+    sorted_indices = sorted(range(len(scores)), key=lambda i: (-scores[i], i))
+
+    for rank, idx in enumerate(sorted_indices):
+        original_score = fixed_rankings[idx]["overall_score"]
+        # Apply micro-adjustment: -0.001 per rank position to maintain order
+        adjusted_score = original_score - (rank * 0.001)
+        
+        if abs(adjusted_score - original_score) > 0.0001:
+            adjustments_made += 1
+
+        fixed_rankings[idx]["overall_score"] = round(adjusted_score, 3)
+        fixed_rankings[idx]["uniqueness_verified"] = True
+        fixed_rankings[idx]["micro_adjustment"] = round(adjusted_score - original_score, 3)
+
+    # Re-validate after adjustments
+    new_scores = [r["overall_score"] for r in fixed_rankings]
+    is_now_unique = len(new_scores) == len(set(new_scores))
+
+    report = f"Found {len([i for i in duplicates if i < len(rankings)])} candidates with duplicate scores. "
+    if is_now_unique:
+        report += f"Applied {adjustments_made} micro-adjustments. ✓ All scores now unique."
+    else:
+        report += "Warning: Could not fully resolve duplicates."
+
+    return {
+        "is_unique": is_now_unique,
+        "duplicate_count": len(set(duplicates)),
+        "duplicates": list(set(duplicates)),
+        "fixed_rankings": fixed_rankings,
+        "adjustments_made": adjustments_made,
+        "report": report,
+    }
+
+
+def generate_score_report(rankings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Generate a detailed score report showing:
+    - All scores sorted (highest to lowest)
+    - Uniqueness status
+    - Tiebreaker contributions
+    - Ranking stability
+    
+    Args:
+        rankings: List of ranking results
+        
+    Returns:
+        Detailed report dictionary
+    """
+    if not rankings:
+        return {
+            "total_candidates": 0,
+            "score_summary": [],
+            "uniqueness_status": "N/A",
+            "score_spread": {"min": None, "max": None, "range": None},
+        }
+
+    # Sort by score descending
+    sorted_rankings = sorted(
+        rankings,
+        key=lambda r: (-r.get("overall_score", 0), r.get("candidate_id", "")),
+    )
+
+    scores = [r.get("overall_score", 0) for r in sorted_rankings]
+    unique_scores = len(set(scores)) == len(scores)
+
+    score_summary = []
+    for rank, result in enumerate(sorted_rankings, 1):
+        score_summary.append({
+            "rank": rank,
+            "candidate_id": result.get("candidate_id", f"Candidate {rank}"),
+            "overall_score": result.get("overall_score", 0),
+            "decision": result.get("decision", "UNKNOWN"),
+            "tiebreaker_score": result.get("tiebreaker_score", 0),
+            "adjustment": result.get("uniqueness_adjustment", 0),
+        })
+
+    return {
+        "total_candidates": len(rankings),
+        "score_summary": score_summary,
+        "uniqueness_status": "✓ Unique" if unique_scores else "✗ Duplicates Found",
+        "score_spread": {
+            "min": min(scores) if scores else None,
+            "max": max(scores) if scores else None,
+            "range": (max(scores) - min(scores)) if scores else None,
+        },
+        "all_scores": sorted(set(scores), reverse=True),
+    }
+
