@@ -45,6 +45,9 @@ COPY backend/ ./backend/
 # __file__ = /app/backend/talentlens/api.py → parent.parent.parent = /app
 COPY --from=frontend-build /frontend/dist ./dist/
 
+# Copy mock resumes for validation endpoint
+COPY mock_resumes/ ./mock_resumes/
+
 # Create required directories
 RUN mkdir -p /app/backend/uploads /app/backend/data
 
