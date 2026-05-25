@@ -65,19 +65,22 @@ class EmailService:
         message["Subject"] = subject
         message.set_content(body)
 
-        await aiosmtplib.send(
-            message,
-            hostname=settings.SMTP_SERVER,
-            port=settings.SMTP_PORT,
-            username=settings.SMTP_USERNAME,
-            password=settings.SMTP_PASSWORD,
-            use_tls=(settings.SMTP_PORT == 465),
-            start_tls=(settings.SMTP_PORT == 587),
+        # Protect against hung connection with asyncio.wait_for and aiosmtplib timeout parameter
+        await asyncio.wait_for(
+            aiosmtplib.send(
+                message,
+                hostname=settings.SMTP_SERVER,
+                port=settings.SMTP_PORT,
+                username=settings.SMTP_USERNAME,
+                password=settings.SMTP_PASSWORD,
+                use_tls=(settings.SMTP_PORT == 465),
+                start_tls=(settings.SMTP_PORT == 587),
+                timeout=10.0,
+            ),
+            timeout=12.0
         )
 
     async def _send_via_resend(self, recipient: str, subject: str, body: str):
-        # We can implement HTTP call to resend API here if needed.
-        # Since this project focuses on local models, we mock it for now.
         import httpx
         url = "https://api.resend.com/emails"
         headers = {
@@ -90,7 +93,7 @@ class EmailService:
             "subject": subject,
             "text": body
         }
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
 

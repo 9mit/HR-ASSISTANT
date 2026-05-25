@@ -696,9 +696,11 @@ def check_batch_score_uniqueness(rankings: List[Dict[str, Any]]) -> Dict[str, An
     sorted_indices = sorted(range(len(scores)), key=lambda i: (-scores[i], i))
 
     for rank, idx in enumerate(sorted_indices):
-        original_score = fixed_rankings[idx]["overall_score"]
+        original_score = fixed_rankings[idx]["overall_score"] or 0.0
         # Apply micro-adjustment: -0.001 per rank position to maintain order
         adjusted_score = original_score - (rank * 0.001)
+        # Ensure it doesn't go below 0.0
+        adjusted_score = max(0.0, adjusted_score)
         
         if abs(adjusted_score - original_score) > 0.0001:
             adjustments_made += 1

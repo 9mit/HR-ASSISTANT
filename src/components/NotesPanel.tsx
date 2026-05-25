@@ -39,22 +39,24 @@ export function NotesPanel({ candidateId, initialNotes = '', onUpdateNotes }: No
   };
 
   return (
-    <div className="bg-stone-900/50 border border-stone-800 rounded-2xl p-8 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-display font-semibold text-stone-100 flex items-center gap-2">
-          <StickyNote className="w-5 h-5 text-emerald-400" />
-          Private Notes
-        </h3>
-        <span className="text-xs font-medium text-stone-500 bg-stone-800 px-3 py-1 rounded-full">Internal Only</span>
-      </div>
-      
-      <div className="flex-1 flex flex-col">
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Add your private notes about this candidate here..."
-          className="flex-1 w-full bg-stone-950 border border-stone-800 rounded-xl p-6 text-sm text-stone-300 placeholder:text-stone-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all resize-none min-h-[300px]"
-        />
+    <div className="glass-panel rounded-2xl p-8 h-full flex flex-col justify-between">
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-display font-semibold text-stone-100 flex items-center gap-2">
+            <StickyNote className="w-5 h-5 text-emerald-400 text-glow-emerald" />
+            Private Notes
+          </h3>
+          <span className="text-[10px] font-bold tracking-wider text-stone-500 bg-stone-900/50 border border-stone-850 px-3 py-1 rounded-full uppercase">Internal Only</span>
+        </div>
+        
+        <div className="flex-1 flex flex-col">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add your private notes about this candidate here..."
+            className="flex-1 w-full bg-stone-950/60 border border-stone-850 rounded-xl p-6 text-sm text-stone-300 placeholder:text-stone-600 focus:outline-none focus:ring-2 focus:ring-emerald-450/15 focus:border-emerald-400/50 transition-all resize-none min-h-[250px]"
+          />
+        </div>
       </div>
 
       <div className="mt-8 flex justify-end">
@@ -65,7 +67,7 @@ export function NotesPanel({ candidateId, initialNotes = '', onUpdateNotes }: No
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="flex items-center gap-2 text-emerald-400 font-medium px-6 py-3"
+              className="flex items-center gap-2 text-emerald-400 font-semibold px-6 py-3 text-xs uppercase tracking-wider"
             >
               <CheckCircle2 className="w-5 h-5" />
               Notes Saved
@@ -77,16 +79,16 @@ export function NotesPanel({ candidateId, initialNotes = '', onUpdateNotes }: No
               whileTap={{ scale: 0.98 }}
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-70 disabled:hover:bg-emerald-600 text-stone-950 px-8 py-3 rounded-xl font-medium transition-colors shadow-lg shadow-emerald-500/20"
+              className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-stone-950 px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin text-stone-950" />
                   Saving...
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4" />
+                  <Save className="w-4 h-4 text-stone-950" />
                   Save Notes
                 </>
               )}

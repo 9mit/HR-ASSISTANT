@@ -205,31 +205,31 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_34%),linear-gradient(180deg,#111412_0%,#0b0d0c_52%,#060706_100%)] font-sans text-stone-100 selection:bg-emerald-500/30">
-      <header className="sticky top-0 z-20 border-b border-stone-800/80 bg-stone-950/80 backdrop-blur-xl">
+    <div className="min-h-screen font-sans text-stone-100 selection:bg-emerald-500/30">
+      <header className="sticky top-0 z-20 border-b border-stone-850/60 bg-stone-950/75 backdrop-blur-md">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-500/10 shadow-[0_0_40px_rgba(16,185,129,0.18)]">
-              <ShieldCheck className="h-6 w-6 text-emerald-300" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/5 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+              <ShieldCheck className="h-5 w-5 text-emerald-400" />
             </div>
             <div>
-              <p className="font-display text-2xl font-semibold tracking-tight text-stone-50">TalentLens</p>
-              <p className="text-xs uppercase tracking-[0.24em] text-stone-500">Local Candidate Intelligence</p>
+              <p className="font-display text-xl font-semibold tracking-tight text-stone-50">TalentLens</p>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-stone-500">Local Candidate Intelligence</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden items-center gap-4 md:flex">
-              <div className="flex items-center gap-2 rounded-full border border-stone-800 bg-stone-900/50 px-4 py-2 text-sm">
-                <div className={`h-2 w-2 rounded-full ${activeModel?.status === 'ready' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                <span className="text-stone-400">Active Engine:</span>
-                <span className="font-medium text-stone-200">{activeModel?.label || 'Loading...'}</span>
+              <div className="flex items-center gap-2 rounded-full border border-stone-850 bg-stone-900/40 px-4 py-1.5 text-xs">
+                <div className={`h-1.5 w-1.5 rounded-full ${activeModel?.status === 'ready' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="text-stone-500">Active Engine:</span>
+                <span className="font-medium text-stone-300">{activeModel?.label || 'Loading...'}</span>
               </div>
             </div>
             <button 
               onClick={() => setIsSettingsOpen(true)}
-              className="group flex h-10 w-10 items-center justify-center rounded-full border border-stone-800 bg-stone-900/50 transition-all hover:bg-emerald-500/10 hover:border-emerald-500/30"
+              className="group flex h-9 w-9 items-center justify-center rounded-xl border border-stone-850 bg-stone-900/40 transition-all hover:bg-emerald-500/10 hover:border-emerald-500/30"
             >
-              <Settings className="h-5 w-5 text-stone-400 transition-colors group-hover:text-emerald-300" />
+              <Settings className="h-4 w-4 text-stone-400 transition-colors group-hover:text-emerald-400" />
             </button>
           </div>
         </div>
@@ -237,76 +237,85 @@ export default function App() {
 
       <main className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-10 sm:px-6 lg:px-8">
         <section className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr]">
-          <div className="rounded-[2rem] border border-stone-800/70 bg-stone-950/80 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-stone-700 bg-stone-900/80 px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-stone-400">
-              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+          <div className="glass-panel rounded-[2rem] p-8 shadow-xl shadow-black/40">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-stone-800 bg-stone-900/60 px-4 py-1.5 text-[10px] uppercase tracking-[0.2em] text-stone-400">
+              <Sparkles className="h-3.5 w-3.5 text-amber-400" />
               Production-grade local workflow
             </div>
 
-            <h1 className="max-w-3xl font-display text-5xl font-semibold leading-tight text-stone-50">
-              Rank candidates on capability, not identity.
+            <h1 className="max-w-3xl font-display text-4xl font-semibold leading-tight text-stone-50 md:text-5xl">
+              Rank candidates on <span className="gradient-text">capability</span>, not identity.
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-stone-400">
+            <p className="mt-5 max-w-2xl text-sm md:text-base leading-relaxed text-stone-400">
               TalentLens parses resumes in bulk, redacts PII before ranking, scores with auditable factors,
               merges duplicates, and drafts a response for every candidate — completely free, no paid APIs required.
             </p>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-stone-800 bg-stone-900/70 p-4">
-                <Database className="mb-3 h-5 w-5 text-emerald-300" />
+              <div className="glass-panel-interactive rounded-2xl p-4">
+                <Database className="mb-3 h-5 w-5 text-emerald-400" />
                 <p className="text-sm font-medium text-stone-200">SQLite audit trail</p>
-                <p className="mt-1 text-sm text-stone-500">Every score, note, and email action is reproducible.</p>
+                <p className="mt-1 text-xs text-stone-500 leading-normal">Every score, note, and email action is reproducible.</p>
               </div>
-              <div className="rounded-2xl border border-stone-800 bg-stone-900/70 p-4">
-                <ScanSearch className="mb-3 h-5 w-5 text-cyan-300" />
+              <div className="glass-panel-interactive rounded-2xl p-4">
+                <ScanSearch className="mb-3 h-5 w-5 text-cyan-400" />
                 <p className="text-sm font-medium text-stone-200">Semantic matching</p>
-                <p className="mt-1 text-sm text-stone-500">TF-IDF + cosine similarity for deterministic ranking.</p>
+                <p className="mt-1 text-xs text-stone-500 leading-normal">TF-IDF + cosine similarity for deterministic ranking.</p>
               </div>
-              <div className="rounded-2xl border border-stone-800 bg-stone-900/70 p-4">
-                <Scale className="mb-3 h-5 w-5 text-amber-300" />
+              <div className="glass-panel-interactive rounded-2xl p-4">
+                <Scale className="mb-3 h-5 w-5 text-amber-400" />
                 <p className="text-sm font-medium text-stone-200">Explainable scoring</p>
-                <p className="mt-1 text-sm text-stone-500">Weighted factors plus audit logs for every decision.</p>
+                <p className="mt-1 text-xs text-stone-500 leading-normal">Weighted factors plus audit logs for every decision.</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-stone-800/70 bg-stone-950/80 p-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-stone-500">Fairness guardrails</p>
-            <ul className="mt-5 space-y-4 text-sm leading-7 text-stone-300">
-              <li className="rounded-2xl border border-stone-800 bg-stone-900/70 p-4">
+          <div className="glass-panel rounded-[2rem] p-6 shadow-xl">
+            <p className="text-[10px] uppercase tracking-[0.25em] text-stone-500 font-medium">Fairness guardrails</p>
+            <ul className="mt-5 space-y-4 text-xs md:text-sm text-stone-300">
+              <li className="glass-panel-interactive rounded-xl p-4">
                 Ranking inputs exclude name, gender markers, phone, address, and other direct identifiers.
               </li>
-              <li className="rounded-2xl border border-stone-800 bg-stone-900/70 p-4">
+              <li className="glass-panel-interactive rounded-xl p-4">
                 Salary is a pre-score gate. Out-of-range or missing expectations are held before weighting.
               </li>
-              <li className="rounded-2xl border border-stone-800 bg-stone-900/70 p-4">
+              <li className="glass-panel-interactive rounded-xl p-4">
                 Candidates without GitHub get a neutral project score (50) — no bias.
               </li>
-              <li className="rounded-2xl border border-stone-800 bg-stone-900/70 p-4">
+              <li className="glass-panel-interactive rounded-xl p-4">
                 Communication drafts are generated locally so no candidate gets ghosted.
               </li>
             </ul>
           </div>
         </section>
 
-        <div className="flex gap-6 border-b border-stone-800">
+        <div className="flex gap-6 border-b border-stone-850">
           <button 
             onClick={() => setActiveTab('batch')}
-            className={`pb-4 text-sm font-medium transition-all ${activeTab === 'batch' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-stone-500 hover:text-stone-300'}`}
+            className={`relative pb-4 text-sm font-medium transition-all ${activeTab === 'batch' ? 'text-emerald-400 font-semibold' : 'text-stone-500 hover:text-stone-300'}`}
           >
             Upload & Active Batch
+            {activeTab === 'batch' && (
+              <motion.div layoutId="activeMainTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400" />
+            )}
           </button>
           <button 
             onClick={() => setActiveTab('pool')}
-            className={`pb-4 text-sm font-medium transition-all ${activeTab === 'pool' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-stone-500 hover:text-stone-300'}`}
+            className={`relative pb-4 text-sm font-medium transition-all ${activeTab === 'pool' ? 'text-emerald-400 font-semibold' : 'text-stone-500 hover:text-stone-300'}`}
           >
             Under Consideration Pool
+            {activeTab === 'pool' && (
+              <motion.div layoutId="activeMainTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400" />
+            )}
           </button>
           <button 
             onClick={() => setActiveTab('rejected')}
-            className={`pb-4 text-sm font-medium transition-all ${activeTab === 'rejected' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-stone-500 hover:text-stone-300'}`}
+            className={`relative pb-4 text-sm font-medium transition-all ${activeTab === 'rejected' ? 'text-emerald-400 font-semibold' : 'text-stone-500 hover:text-stone-300'}`}
           >
             Rejected Candidates
+            {activeTab === 'rejected' && (
+              <motion.div layoutId="activeMainTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400" />
+            )}
           </button>
         </div>
 
@@ -351,41 +360,41 @@ export default function App() {
                   {summaryCards(summary).map((card) => (
                     <div
                       key={card.label}
-                      className="rounded-2xl border border-stone-800 bg-stone-950/80 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.2)]"
+                      className="glass-panel-interactive rounded-2xl p-5 shadow-lg"
                     >
-                      <p className="text-sm uppercase tracking-[0.18em] text-stone-500">{card.label}</p>
-                      <p className="mt-2 font-display text-4xl font-semibold text-stone-50">{card.value}</p>
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-stone-500">{card.label}</p>
+                      <p className="mt-2 font-display text-4xl font-semibold gradient-text">{card.value}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="rounded-2xl border border-stone-800 bg-stone-950/80 p-6">
+                <div className="glass-panel rounded-2xl p-6 shadow-lg">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.18em] text-stone-500">Batch summary</p>
-                      <h2 className="mt-2 font-display text-2xl font-semibold text-stone-50">{summary.role}</h2>
-                      <p className="mt-2 text-sm text-stone-500">Processed with {summary.selected_model_label || summary.model_backend}</p>
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-stone-500">Batch summary</p>
+                      <h2 className="mt-1 font-display text-xl font-semibold text-stone-50">{summary.role}</h2>
+                      <p className="mt-1 text-xs text-stone-500">Processed with {summary.selected_model_label || summary.model_backend}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       {batchId && (
                         <a
                           href={`${apiUrl}/api/export-candidates/${batchId}`}
                           download
-                          className="flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-300 transition-all hover:bg-cyan-500/20 hover:border-cyan-400/40"
+                          className="flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-2 text-xs font-semibold text-cyan-300 transition-all hover:bg-cyan-500/10 hover:border-cyan-500/30"
                         >
-                          <Download className="h-4 w-4" />
+                          <Download className="h-3.5 w-3.5" />
                           Export CSV
                         </a>
                       )}
-                      <div className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300">
+                      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-xs font-semibold text-emerald-400">
                         {summary.salary_range.minimum.toLocaleString()} - {summary.salary_range.maximum.toLocaleString()} {summary.salary_range.currency}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-6 space-y-3">
+                  <div className="mt-6 space-y-2">
                     {summary.fairness_highlights.map((highlight, index) => (
-                      <div key={index} className="rounded-2xl border border-stone-800 bg-stone-900/70 px-4 py-3 text-sm text-stone-300">
+                      <div key={index} className="rounded-xl border border-stone-850/60 bg-stone-900/30 px-4 py-2.5 text-xs text-stone-400">
                         {highlight}
                       </div>
                     ))}

@@ -794,12 +794,18 @@ async def export_candidates(batch_id: int, db: Session = Depends(get_db)):
         "Email Sent",
     ])
 
-    for c in candidates:
-        # Check if email was sent
-        email_record = db.query(Email).filter(
-            Email.candidate_id == c.id,
+    # Pre-fetch all sent emails for candidates in this batch to prevent N+1 queries
+    candidate_ids = [c.id for c in candidates]
+    sent_emails_map = {}
+    if candidate_ids:
+        sent_emails = db.query(Email).filter(
+            Email.candidate_id.in_(candidate_ids),
             Email.status == "sent",
-        ).first()
+        ).all()
+        sent_emails_map = {e.candidate_id: True for e in sent_emails}
+
+    for c in candidates:
+        has_email_sent = c.id in sent_emails_map
 
         decision_label = {
             "shortlist": "Accepted",
@@ -816,7 +822,7 @@ async def export_candidates(batch_id: int, db: Session = Depends(get_db)):
             decision_label,
             batch.job_title,
             ", ".join(c.skills[:8]) if c.skills else "N/A",
-            "Yes" if email_record else "No",
+            "Yes" if has_email_sent else "No",
         ])
 
     output.seek(0)

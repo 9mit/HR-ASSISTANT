@@ -176,7 +176,16 @@ class ResumeParser:
             return ""
 
     def parse(self, file_name: str, raw_text: str) -> ParsedResume:
-        cleaned_text = self._clean_text(raw_text)
+        # Prevent CPU exhaustion / ReDoS / memory overload on massive text
+        truncated_text = (raw_text or "")[:100000]
+        cleaned_text = self._clean_text(truncated_text)
+        
+        if not cleaned_text or cleaned_text.strip() == "":
+            raise ValueError(
+                "The resume file is empty or could not be parsed. "
+                "Please make sure it contains readable text and is not corrupted."
+            )
+            
         lines = [line.strip() for line in cleaned_text.splitlines() if line.strip()]
         urls = [match[0] for match in URL_RE.findall(cleaned_text)]
         github_url = self._extract_github(urls, cleaned_text)
