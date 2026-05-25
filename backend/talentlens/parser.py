@@ -26,6 +26,9 @@ from .utils import (
 
 logger = logging.getLogger(__name__)
 
+MAX_DOCX_UNCOMPRESSED_BYTES = 25 * 1024 * 1024
+MAX_PDF_PAGES = 100
+
 
 COMMON_SKILLS = [
     "react",
@@ -258,7 +261,7 @@ class ResumeParser:
 
     def _extract_pdf_bytes(self, file_bytes: bytes) -> str:
         reader = PdfReader(io.BytesIO(file_bytes))
-        pages = [page.extract_text() or "" for page in reader.pages]
+        pages = [page.extract_text() or "" for page in reader.pages[:MAX_PDF_PAGES]]
         text = "\n".join(pages)
 
         # Extract hyperlink URLs from PDF annotations (clickable links
@@ -296,6 +299,9 @@ class ResumeParser:
 
     def _extract_docx_bytes(self, file_bytes: bytes) -> str:
         with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+            total_uncompressed = sum(info.file_size for info in archive.infolist())
+            if total_uncompressed > MAX_DOCX_UNCOMPRESSED_BYTES:
+                raise ValueError("DOCX archive exceeds safe size limit")
             xml_bytes = archive.read("word/document.xml")
 
             # Also read hyperlink relationships (URLs behind clickable text).

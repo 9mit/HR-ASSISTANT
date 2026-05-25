@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Candidate } from '../types';
 import { Loader2, Users, Check, ChevronRight } from 'lucide-react';
+import { buildApiHeaders, getApiUrl } from '../api';
 
 interface PoolPanelProps {
   onSelectCandidate: (c: Candidate) => void;
@@ -31,12 +32,14 @@ export function PoolPanel({ onSelectCandidate }: PoolPanelProps) {
   const [shortlistedIds, setShortlistedIds] = useState<Set<string>>(new Set());
   const [finalizing, setFinalizing] = useState(false);
 
-  const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
+  const apiUrl = getApiUrl();
 
   const loadPool = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${apiUrl}/api/pool/candidates?decision=under_consideration`);
+      const res = await fetch(`${apiUrl}/api/pool/candidates?decision=under_consideration`, {
+        headers: buildApiHeaders(),
+      });
       if (!res.ok) throw new Error('Failed to fetch pool');
       const data = await res.json();
       setCandidates(data);
@@ -67,7 +70,7 @@ export function PoolPanel({ onSelectCandidate }: PoolPanelProps) {
     try {
       const res = await fetch(`${apiUrl}/api/pool/finalize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ shortlisted_ids: Array.from(shortlistedIds) })
       });
       if (!res.ok) throw new Error('Failed to finalize pool');

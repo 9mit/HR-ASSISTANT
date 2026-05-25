@@ -1,6 +1,6 @@
 """Pydantic schemas for API validation and response serialization."""
 from __future__ import annotations
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum as PyEnum
@@ -25,7 +25,7 @@ SalaryStatus = Literal["within_range", "missing_expectation", "out_of_range", "u
 
 class SetTargetRequest(BaseModel):
     """Schema for setting target job role."""
-    job_title: str = Field(..., description="Target job title")
+    job_title: str = Field(..., min_length=1, max_length=200, description="Target job title")
     job_description: Optional[str] = Field(None, description="Job description")
     salary_min: Optional[float] = Field(None, description="Minimum salary")
     salary_max: Optional[float] = Field(None, description="Maximum salary")
@@ -52,8 +52,15 @@ class SaveNoteRequest(BaseModel):
 
 class SaveNotesRequest(BaseModel):
     """Schema for saving HR notes (Frontend)."""
-    candidate_id: str
-    notes: str
+    candidate_id: str = Field(..., max_length=32)
+    notes: str = Field(..., max_length=10000)
+
+    @field_validator("candidate_id")
+    @classmethod
+    def candidate_id_numeric(cls, value: str) -> str:
+        if not value.isdigit():
+            raise ValueError("candidate_id must be numeric")
+        return value
 
 
 class SendEmailRequest(BaseModel):

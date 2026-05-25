@@ -30,7 +30,7 @@ services:
     command: uvicorn talentlens.api:app --host 0.0.0.0 --port 8000 --reload
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-hr_ranking_db}
-      DEBUG: ${DEBUG:-true}
+      DEBUG: ${DEBUG:-false}
       SMTP_SERVER: ${SMTP_SERVER:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}

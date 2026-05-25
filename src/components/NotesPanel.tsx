@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Save, Loader2, CheckCircle2, StickyNote } from 'lucide-react';
+import { buildApiHeaders, getApiUrl } from '../api';
 
 interface NotesPanelProps {
   candidateId: string;
@@ -12,7 +13,7 @@ export function NotesPanel({ candidateId, initialNotes = '', onUpdateNotes }: No
   const [notes, setNotes] = useState(initialNotes);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
+  const apiUrl = getApiUrl();
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -20,9 +21,7 @@ export function NotesPanel({ candidateId, initialNotes = '', onUpdateNotes }: No
       // API call to save notes
       const response = await fetch(`${apiUrl}/api/save-note`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ candidate_id: candidateId, notes }),
       });
       

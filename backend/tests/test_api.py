@@ -89,5 +89,5 @@ async def test_process_resumes_security_fail_fast():
                 files={"resumes": ("c.txt", b"Test", "text/plain")},
             )
             
-            assert response.status_code == 500
+            assert response.status_code == 400
             assert "OPENAI_API_KEY is missing" in response.json()["detail"]

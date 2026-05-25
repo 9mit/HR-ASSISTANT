@@ -7,6 +7,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, APIRouter, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import Any, List, Optional
@@ -46,7 +47,20 @@ from .ranking import (
 from .audit import AuditService
 from .llm_service import LLMService, LLMAnalysis, BUILTIN_MODEL_ID
 from .email_service import email_service
-from .utils import compact_whitespace, unique_preserve_order
+from .utils import compact_whitespace, unique_preserve_order, sanitize_filename
+from .security import (
+    ApiKeyDep,
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+    public_error_detail,
+    register_exception_handlers,
+    safe_upload_path,
+    validate_decision,
+    validate_note_content,
+    validate_role,
+    validate_salary_range,
+    validate_upload_file,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -99,17 +113,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware
+# Security middleware (order: last added = outermost)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(
+    RateLimitMiddleware,
+    max_requests=settings.RATE_LIMIT_REQUESTS,
+    window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=bool(settings.ALLOWED_ORIGINS),
+    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_headers=["Content-Type", "X-API-Key", "X-Ephemeral-Keys", "Authorization"],
+    expose_headers=["Content-Disposition"],
+    max_age=600,
 )
+register_exception_handlers(app)
 
-# API Router
-api_router = APIRouter(prefix="/api")
+# Public routes (health, model catalog) — no API key required
+public_router = APIRouter(prefix="/api")
+# Protected routes — optional API key when API_KEY is set
+api_router = APIRouter(prefix="/api", dependencies=[ApiKeyDep])
 
 # Initialize services
 resume_parser = ResumeParser()
@@ -195,7 +220,7 @@ def _candidate_summary(ranking_result: dict[str, Any], local_analysis: LLMAnalys
 
 # ============ Health Check ============
 
-@api_router.get("/health")
+@public_router.get("/health")
 async def health_check() -> dict[str, Any]:
     """Health check endpoint."""
     return {
@@ -205,7 +230,7 @@ async def health_check() -> dict[str, Any]:
     }
 
 
-@api_router.get("/local-models", response_model=LocalModelCatalogResponse)
+@public_router.get("/local-models", response_model=LocalModelCatalogResponse)
 async def list_local_models(
     x_ephemeral_keys: Optional[str] = Header(None),
 ) -> LocalModelCatalogResponse:
@@ -227,6 +252,9 @@ async def validate_mock(
     """
     Validate the system against mock resumes stored in the mock_resumes folder.
     """
+    if not settings.DEBUG and not settings.ENABLE_MOCK_VALIDATION:
+        raise HTTPException(status_code=403, detail="Mock validation is disabled in production")
+
     mock_dir = Path(__file__).resolve().parent.parent.parent / "mock_resumes"
     if not mock_dir.exists():
         raise HTTPException(status_code=404, detail="Mock resumes directory not found")
@@ -283,6 +311,23 @@ async def process_resumes(
     When auto_send_emails=True, emails are sent automatically to all candidates
     based on their score decision (shortlist, rejected, etc.).
     """
+    if len(resumes) > settings.MAX_UPLOAD_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum {settings.MAX_UPLOAD_FILES} files per batch",
+        )
+
+    if auto_send_emails:
+        if not hr_email or len(hr_email) > 254:
+            raise HTTPException(status_code=400, detail="Valid hr_email is required for auto-send")
+        try:
+            from email_validator import validate_email, EmailNotValidError
+            validate_email(hr_email, check_deliverability=False)
+        except EmailNotValidError:
+            raise HTTPException(status_code=400, detail="Invalid hr_email format")
+
+    role = validate_role(role)
+    salary_min, salary_max = validate_salary_range(salary_min, salary_max)
     ephemeral_keys = _parse_ephemeral_keys(x_ephemeral_keys)
 
     return await _run_candidate_pipeline(
@@ -348,10 +393,10 @@ async def _run_candidate_pipeline(
         # 2. Process Files
         for idx, file in enumerate(resumes):
             try:
-                # Save file
-                filename = f"batch_{batch.id}_{idx}_{file.filename}"
-                filepath = uploads_dir / filename
                 contents = await file.read()
+                safe_name = validate_upload_file(file.filename, len(contents))
+                filename = f"batch_{batch.id}_{idx}_{safe_name}"
+                filepath = uploads_dir / filename
                 with open(filepath, "wb") as f:
                     f.write(contents)
                 
@@ -584,7 +629,7 @@ async def _run_candidate_pipeline(
                     score=0.0,
                     decision="invalid",
                     file_name=file.filename,
-                    error=str(fe),
+                    error=public_error_detail(fe) if not settings.DEBUG else str(fe),
                     summary=f"Failed to process {file.filename}",
                 )
                 candidates_list.append(error_record)
@@ -658,9 +703,13 @@ async def _run_candidate_pipeline(
             candidates=candidates_list
         )
         
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Pipeline error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=public_error_detail(e))
 
 
 # ============ Legacy Endpoints (under /api) ============
@@ -681,8 +730,10 @@ async def set_target(request: SetTargetRequest, db: Session = Depends(get_db)) -
         db.commit()
         db.refresh(batch)
         return ApiMessage(message=f"Target role set successfully", data={"batch_id": batch.id})
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=public_error_detail(e))
 
 @api_router.get("/candidates/{candidate_id}", response_model=CandidateResponse)
 async def get_candidate_profile(candidate_id: int, db: Session = Depends(get_db)) -> CandidateResponse:
@@ -697,20 +748,23 @@ async def save_note(request: SaveNotesRequest, db: Session = Depends(get_db)) ->
     """Save HR notes."""
     try:
         c_id = int(request.candidate_id)
+        content = validate_note_content(request.notes)
         # Check if note exists for candidate
         note = db.query(Note).filter(Note.candidate_id == c_id).first()
         if note:
-            note.content = request.notes
+            note.content = content
             note.updated_at = datetime.now(timezone.utc)
         else:
-            note = Note(candidate_id=c_id, content=request.notes)
+            note = Note(candidate_id=c_id, content=content)
             db.add(note)
         
         db.commit()
         return ApiMessage(message="Note saved successfully")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid candidate id")
     except Exception as e:
         logger.error(f"Error saving note: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to save note")
+        raise HTTPException(status_code=500, detail=public_error_detail(e))
 
 
 @api_router.put("/candidates/{candidate_id}/decision")
@@ -720,7 +774,7 @@ async def update_decision(candidate_id: int, request: SetDecisionRequest, db: Se
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
     
-    candidate.decision = request.decision
+    candidate.decision = validate_decision(request.decision)
     if candidate.raw_record:
         rec = candidate.raw_record.copy()
         rec["decision"] = request.decision
@@ -734,6 +788,7 @@ async def update_decision(candidate_id: int, request: SetDecisionRequest, db: Se
 async def get_pool_candidates(decision: str, db: Session = Depends(get_db)):
     """Fetch candidates from the global pool by their current decision."""
     try:
+        decision = validate_decision(decision)
         candidates = db.query(Candidate).filter(Candidate.decision == decision).order_by(Candidate.score.desc()).all()
         records = []
         for c in candidates:
@@ -743,9 +798,11 @@ async def get_pool_candidates(decision: str, db: Session = Depends(get_db)):
                 rec["decision"] = c.decision
                 records.append(rec)
         return records
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching pool candidates: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail=public_error_detail(e))
 
 
 @api_router.post("/pool/finalize")
@@ -826,7 +883,7 @@ async def export_candidates(batch_id: int, db: Session = Depends(get_db)):
         ])
 
     output.seek(0)
-    safe_title = batch.job_title.replace(" ", "_")[:30]
+    safe_title = sanitize_filename(batch.job_title.replace(" ", "_"))[:30]
     filename = f"TalentLens_{safe_title}_{batch.id}.csv"
 
     return StreamingResponse(
@@ -836,13 +893,21 @@ async def export_candidates(batch_id: int, db: Session = Depends(get_db)):
     )
 
 
-# Include Router
+@api_router.get("/uploads/{stored_file}")
+async def download_upload(stored_file: str):
+    """Serve a single uploaded resume with path-traversal protection."""
+    path = safe_upload_path(uploads_dir, stored_file)
+    return FileResponse(
+        path,
+        media_type="application/octet-stream",
+        filename=path.name,
+        headers={"Content-Disposition": f'attachment; filename="{path.name}"'},
+    )
+
+
+# Include Routers
+app.include_router(public_router)
 app.include_router(api_router)
-
-
-# Serve uploaded resume files for frontend preview/download
-if uploads_dir.exists():
-    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 # Serve static frontend files if they exist
 frontend_build = Path(__file__).resolve().parent.parent.parent / "dist"

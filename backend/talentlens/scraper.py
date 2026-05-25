@@ -7,6 +7,7 @@ import re
 import time
 
 from .settings import settings
+from .security import validate_github_username
 
 logger = logging.getLogger(__name__)
 
@@ -467,11 +468,7 @@ class GitHubScraper:
             return None
         match = re.search(r"github\.com/([A-Za-z0-9_.-]+)", github_url, re.IGNORECASE)
         if match:
-            username = match.group(1)
-            # Filter out common reserved paths
-            if username.lower() in {"settings", "features", "about", "explore", "trending", "pricing", "topics"}:
-                return None
-            return username
+            return validate_github_username(match.group(1))
         return None
 
     def _empty_response(self) -> Dict[str, Any]:

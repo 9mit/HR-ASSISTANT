@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Candidate } from '../types';
 import { Loader2, Mail, Send, ChevronRight } from 'lucide-react';
+import { buildApiHeaders, getApiUrl } from '../api';
 
 interface RejectedPanelProps {
   onSelectCandidate: (c: Candidate) => void;
@@ -29,12 +30,14 @@ export function RejectedPanel({ onSelectCandidate }: RejectedPanelProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
+  const apiUrl = getApiUrl();
 
   const loadRejected = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${apiUrl}/api/pool/candidates?decision=rejected`);
+      const res = await fetch(`${apiUrl}/api/pool/candidates?decision=rejected`, {
+        headers: buildApiHeaders(),
+      });
       if (!res.ok) throw new Error('Failed to fetch rejected candidates');
       const data = await res.json();
       setCandidates(data);

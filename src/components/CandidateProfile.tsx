@@ -5,6 +5,7 @@ import { XCircle, Github, ShieldCheck, FileText, Mail, User, Briefcase, Graduati
 import { AuditLog } from './AuditLog';
 import { EmailPanel } from './EmailPanel';
 import { NotesPanel } from './NotesPanel';
+import { buildApiHeaders, getApiUrl } from '../api';
 
 interface CandidateProfileProps {
   candidate: Candidate;
@@ -17,14 +18,14 @@ type Tab = 'overview' | 'resume' | 'audit' | 'github' | 'email' | 'notes';
 export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: CandidateProfileProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [isMoving, setIsMoving] = useState(false);
-  const apiUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
+  const apiUrl = getApiUrl();
 
   const handleMoveToPool = async () => {
     setIsMoving(true);
     try {
       const response = await fetch(`${apiUrl}/api/candidates/${candidate.id}/decision`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ decision: 'under_consideration' })
       });
       if (!response.ok) throw new Error('Failed to update decision');
@@ -198,7 +199,7 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
                     </h3>
                     {candidate.stored_file && (
                       <a 
-                        href={`${apiUrl}/uploads/${candidate.stored_file}`} 
+                        href={`${apiUrl}/api/uploads/${candidate.stored_file}`} 
                         download={candidate.file_name}
                         className="px-4 py-2 bg-stone-900 border border-stone-850 text-stone-200 text-xs font-semibold rounded-xl transition-all hover:bg-stone-850"
                       >
@@ -217,7 +218,7 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
                       </p>
                       <div className="flex items-center gap-4">
                         <a 
-                          href={`${apiUrl}/uploads/${candidate.stored_file}`} 
+                          href={`${apiUrl}/api/uploads/${candidate.stored_file}`} 
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-5 py-2.5 bg-stone-900 hover:bg-stone-850 text-stone-200 text-xs font-semibold rounded-xl transition-all border border-stone-850 shadow-md"
@@ -225,7 +226,7 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
                           Open in New Tab
                         </a>
                         <a 
-                          href={`${apiUrl}/uploads/${candidate.stored_file}`} 
+                          href={`${apiUrl}/api/uploads/${candidate.stored_file}`} 
                           download={candidate.file_name}
                           className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-stone-950 text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/10"
                         >

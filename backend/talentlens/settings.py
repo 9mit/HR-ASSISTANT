@@ -1,7 +1,8 @@
 import os
+import secrets
 from pathlib import Path
 from typing import List
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -64,11 +65,30 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
 
     # Security
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    API_KEY: str = ""
+    MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024
+    MAX_UPLOAD_FILES: int = 50
+    RATE_LIMIT_REQUESTS: int = 120
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
+    ENABLE_MOCK_VALIDATION: bool = False
+    ENABLE_HSTS: bool = False
+    HSTS_MAX_AGE: int = 31536000
+    CONTENT_SECURITY_POLICY: str = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
 
-    # CORS
+    # CORS — comma-separated in .env, e.g. http://localhost:5173,https://myapp.hf.space
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
@@ -76,7 +96,6 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:7860",
-        "https://*.hf.space",
     ]
 
     class Config:
@@ -91,6 +110,23 @@ class Settings(BaseSettings):
             return value
         normalized = str(value).strip().lower()
         return normalized in {"1", "true", "yes", "on", "debug"}
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, value):
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @model_validator(mode="after")
+    def ensure_secret_key(self):
+        if not self.SECRET_KEY:
+            self.SECRET_KEY = (
+                "dev-secret-key-change-in-production"
+                if self.DEBUG
+                else secrets.token_urlsafe(32)
+            )
+        return self
 
 
 def get_api_key_for_provider(provider_id: str, ephemeral_keys: dict | None = None) -> str:
@@ -133,3 +169,11 @@ def validate_api_keys(settings_obj: "Settings", provider_id: str, ephemeral_keys
 
 
 settings = Settings()
+
+if not settings.DEBUG and not settings.API_KEY:
+    import logging as _logging
+
+    _logging.getLogger(__name__).warning(
+        "API_KEY is not set. Mutating endpoints are open to anyone on the network. "
+        "Set API_KEY in production to require X-API-Key header authentication."
+    )

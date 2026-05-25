@@ -59,6 +59,5 @@ async def test_fail_fast_security():
                 data={"role": "Lead", "salary_min": 0, "salary_max": 10, "selected_model_id": "openai:gpt4"},
                 files={"resumes": ("test.txt", b"Skills: AI", "text/plain")},
              )
-             # The error is caught and wrapped in HTTPException(500)
-             assert response.status_code == 500
+             assert response.status_code == 400
              assert "OPENAI_API_KEY is missing" in response.json()["detail"]

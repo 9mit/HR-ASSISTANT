@@ -70,6 +70,6 @@ Thumbs.db
 *.key
 
 
-# Local Scratch
+# Local scratch & debug utilities
 backend/scratch/
-audit_and_rebuild_documentation.md
+backend/debug_parser.py

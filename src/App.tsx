@@ -8,6 +8,7 @@ import { CandidateProfile } from './components/CandidateProfile';
 
 import { PoolPanel } from './components/PoolPanel';
 import { RejectedPanel } from './components/RejectedPanel';
+import { buildApiHeaders, getApiUrl } from './api';
 
 const summaryCards = (summary: BatchSummary | null) => {
   if (!summary) return [];
@@ -57,8 +58,9 @@ export default function App() {
   const [companyName, setCompanyName] = useState('');
   const [autoSendEmails, setAutoSendEmails] = useState(false);
   const [batchId, setBatchId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
+  const apiUrl = getApiUrl();
 
   const ephemeralHeader = serializeKeys(ephemeralKeys);
 
@@ -68,8 +70,9 @@ export default function App() {
       setModelError(null);
 
       try {
-        const headers: Record<string, string> = {};
-        if (ephemeralHeader) headers['X-Ephemeral-Keys'] = ephemeralHeader;
+        const headers = buildApiHeaders(
+          ephemeralHeader ? { 'X-Ephemeral-Keys': ephemeralHeader } : undefined
+        );
 
         const response = await fetch(`${apiUrl}/api/local-models`, { headers });
         if (!response.ok) {
@@ -133,8 +136,9 @@ export default function App() {
     files.forEach((file) => formData.append('resumes', file));
     
     try {
-      const headers: Record<string, string> = {};
-      if (ephemeralHeader) headers['X-Ephemeral-Keys'] = ephemeralHeader;
+      const headers = buildApiHeaders(
+        ephemeralHeader ? { 'X-Ephemeral-Keys': ephemeralHeader } : undefined
+      );
 
       const response = await fetch(`${apiUrl}/api/process-resumes`, {
         method: 'POST',
@@ -158,6 +162,31 @@ export default function App() {
       setIsProcessing(false);
     }
   };
+  const exportBatchCsv = async () => {
+    if (!batchId) return;
+    setIsExporting(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/export-candidates/${batchId}`, {
+        headers: buildApiHeaders(),
+      });
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match?.[1] || `TalentLens_batch_${batchId}.csv`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setError(e.message || 'CSV export failed');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const validateMockResumes = async () => {
     setIsValidatingMock(true);
     setError(null);
@@ -168,8 +197,9 @@ export default function App() {
     formData.append('selected_model_id', selectedModelId || 'builtin:heuristic');
 
     try {
-      const headers: Record<string, string> = {};
-      if (ephemeralHeader) headers['X-Ephemeral-Keys'] = ephemeralHeader;
+      const headers = buildApiHeaders(
+        ephemeralHeader ? { 'X-Ephemeral-Keys': ephemeralHeader } : undefined
+      );
 
       const response = await fetch(`${apiUrl}/api/validate-mock`, {
         method: 'POST',
@@ -377,14 +407,15 @@ export default function App() {
                     </div>
                     <div className="flex items-center gap-3">
                       {batchId && (
-                        <a
-                          href={`${apiUrl}/api/export-candidates/${batchId}`}
-                          download
-                          className="flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-2 text-xs font-semibold text-cyan-300 transition-all hover:bg-cyan-500/10 hover:border-cyan-500/30"
+                        <button
+                          type="button"
+                          onClick={() => void exportBatchCsv()}
+                          disabled={isExporting}
+                          className="flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-2 text-xs font-semibold text-cyan-300 transition-all hover:bg-cyan-500/10 hover:border-cyan-500/30 disabled:opacity-50"
                         >
                           <Download className="h-3.5 w-3.5" />
-                          Export CSV
-                        </a>
+                          {isExporting ? 'Exporting…' : 'Export CSV'}
+                        </button>
                       )}
                       <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-xs font-semibold text-emerald-400">
                         {summary.salary_range.minimum.toLocaleString()} - {summary.salary_range.maximum.toLocaleString()} {summary.salary_range.currency}
