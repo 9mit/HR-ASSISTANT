@@ -147,6 +147,42 @@ def validate_upload_file(filename: str | None, size: int) -> str:
     return sanitize_filename(filename)
 
 
+def validate_magic_bytes(filename: str, contents: bytes) -> None:
+    """Validate the magic bytes of a file to ensure it matches its extension and is not an executable."""
+    ext = Path(filename).suffix.lower()
+    
+    # Common executable signatures to universally reject
+    exec_signatures = [
+        b"MZ",          # Windows PE (exe, dll)
+        b"\x7fELF",     # Linux ELF
+        b"\xfe\xed\xfa\xce", # Mach-O (macOS)
+        b"\xfe\xed\xfa\xcf",
+        b"\xca\xfe\xba\xbe",
+        b"\xce\xfa\xed\xfe",
+    ]
+    for sig in exec_signatures:
+        if contents.startswith(sig):
+            raise HTTPException(status_code=400, detail="Executable files are strictly prohibited")
+
+    if ext == ".pdf":
+        if not contents.startswith(b"%PDF-"):
+            raise HTTPException(status_code=400, detail="Invalid PDF file signature")
+    elif ext == ".docx":
+        # DOCX is a zip file, standard PKZIP signature
+        if not contents.startswith(b"PK\x03\x04"):
+            raise HTTPException(status_code=400, detail="Invalid DOCX file signature")
+    elif ext == ".txt":
+        # Disallow if it has known magic bytes for other complex formats
+        if contents.startswith(b"%PDF-") or contents.startswith(b"PK\x03\x04"):
+            raise HTTPException(status_code=400, detail="Invalid TXT file: complex binary signature detected")
+        try:
+            # Check if it's actually valid text
+            contents.decode('utf-8')
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid TXT file: must be valid UTF-8 text")
+
+
+
 def validate_decision(decision: str) -> str:
     normalized = (decision or "").strip().lower()
     if normalized not in VALID_DECISIONS:

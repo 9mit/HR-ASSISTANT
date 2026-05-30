@@ -60,6 +60,7 @@ from .security import (
     validate_role,
     validate_salary_range,
     validate_upload_file,
+    validate_magic_bytes,
 )
 
 # Configure logging
@@ -395,7 +396,11 @@ async def _run_candidate_pipeline(
             try:
                 contents = await file.read()
                 safe_name = validate_upload_file(file.filename, len(contents))
-                filename = f"batch_{batch.id}_{idx}_{safe_name}"
+                validate_magic_bytes(file.filename, contents)
+                
+                import uuid
+                ext = Path(file.filename).suffix.lower()
+                filename = f"{uuid.uuid4().hex}{ext}"
                 filepath = uploads_dir / filename
                 with open(filepath, "wb") as f:
                     f.write(contents)

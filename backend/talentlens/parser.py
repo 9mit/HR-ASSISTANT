@@ -6,7 +6,7 @@ import zipfile
 from datetime import datetime
 from html import unescape
 from pathlib import Path
-from xml.etree import ElementTree
+from defusedxml import ElementTree
 
 import logging
 
