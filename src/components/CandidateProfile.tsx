@@ -6,6 +6,7 @@ import { AuditLog } from './AuditLog';
 import { EmailPanel } from './EmailPanel';
 import { NotesPanel } from './NotesPanel';
 import { buildApiHeaders, getApiUrl } from '../api';
+import { useNotifications } from './NotificationContext';
 
 interface CandidateProfileProps {
   candidate: Candidate;
@@ -16,6 +17,7 @@ interface CandidateProfileProps {
 type Tab = 'overview' | 'resume' | 'audit' | 'github' | 'email' | 'notes';
 
 export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: CandidateProfileProps) {
+  const { showNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [isMoving, setIsMoving] = useState(false);
   const apiUrl = getApiUrl();
@@ -31,9 +33,9 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
       if (!response.ok) throw new Error('Failed to update decision');
       const updatedCandidate = { ...candidate, decision: 'under_consideration' };
       onUpdateCandidate(updatedCandidate);
-      alert('Candidate moved to Under Consideration pool!');
+      showNotification('Candidate moved to Under Consideration pool!', 'success');
     } catch (e) {
-      alert('Error moving candidate to pool.');
+      showNotification('Error moving candidate to pool.', 'error');
     } finally {
       setIsMoving(false);
     }

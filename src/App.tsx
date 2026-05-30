@@ -9,6 +9,7 @@ import { CandidateProfile } from './components/CandidateProfile';
 import { PoolPanel } from './components/PoolPanel';
 import { RejectedPanel } from './components/RejectedPanel';
 import { buildApiHeaders, getApiUrl } from './api';
+import { useNotifications } from './components/NotificationContext';
 
 const summaryCards = (summary: BatchSummary | null) => {
   if (!summary) return [];
@@ -31,6 +32,7 @@ function serializeKeys(keys: EphemeralKeys): string | null {
 }
 
 export default function App() {
+  const { showNotification } = useNotifications();
   const [role, setRole] = useState('');
   const [salaryMin, setSalaryMin] = useState('');
   const [salaryMax, setSalaryMax] = useState('');
@@ -113,12 +115,12 @@ export default function App() {
 
   const processResumes = async () => {
     if (!role || files.length === 0 || !salaryMin || !salaryMax) {
-      alert('Enter a role, salary range, and at least one resume.');
+      showNotification('Enter a role, salary range, and at least one resume.', 'error');
       return;
     }
 
     if (autoSendEmails && !hrEmail) {
-      alert('Please enter your email address to enable automatic candidate notifications.');
+      showNotification('Please enter your email address to enable automatic candidate notifications.', 'error');
       return;
     }
 

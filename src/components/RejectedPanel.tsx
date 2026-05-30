@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Candidate } from '../types';
 import { Loader2, Mail, Send, ChevronRight } from 'lucide-react';
 import { buildApiHeaders, getApiUrl } from '../api';
+import { useNotifications } from './NotificationContext';
 
 interface RejectedPanelProps {
   onSelectCandidate: (c: Candidate) => void;
@@ -26,6 +27,7 @@ const rowVariants = {
 };
 
 export function RejectedPanel({ onSelectCandidate }: RejectedPanelProps) {
+  const { showNotification } = useNotifications();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function RejectedPanel({ onSelectCandidate }: RejectedPanelProps) {
   const handleMassReject = () => {
     const emails = candidates.map(c => c.email).filter(Boolean).join(',');
     if (!emails) {
-      alert("No email addresses found for the rejected candidates.");
+      showNotification("No email addresses found for the rejected candidates.", "error");
       return;
     }
 

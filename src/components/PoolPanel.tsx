@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Candidate } from '../types';
 import { Loader2, Users, Check, ChevronRight } from 'lucide-react';
 import { buildApiHeaders, getApiUrl } from '../api';
+import { useNotifications } from './NotificationContext';
 
 interface PoolPanelProps {
   onSelectCandidate: (c: Candidate) => void;
@@ -26,6 +27,7 @@ const rowVariants = {
 };
 
 export function PoolPanel({ onSelectCandidate }: PoolPanelProps) {
+  const { showNotification, showConfirm } = useNotifications();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,24 +66,27 @@ export function PoolPanel({ onSelectCandidate }: PoolPanelProps) {
   };
 
   const finalizePool = async () => {
-    if (!confirm('Are you sure? This will shortlist the selected candidates and reject everyone else in the pool!')) return;
-    
-    setFinalizing(true);
-    try {
-      const res = await fetch(`${apiUrl}/api/pool/finalize`, {
-        method: 'POST',
-        headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ shortlisted_ids: Array.from(shortlistedIds) })
-      });
-      if (!res.ok) throw new Error('Failed to finalize pool');
-      alert('Pool finalized successfully!');
-      setCandidates([]); // Clear pool since everyone is now shortlisted or rejected
-      setShortlistedIds(new Set());
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setFinalizing(false);
-    }
+    showConfirm(
+      'Are you sure? This will shortlist the selected candidates and reject everyone else in the pool!',
+      async () => {
+        setFinalizing(true);
+        try {
+          const res = await fetch(`${apiUrl}/api/pool/finalize`, {
+            method: 'POST',
+            headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ shortlisted_ids: Array.from(shortlistedIds) })
+          });
+          if (!res.ok) throw new Error('Failed to finalize pool');
+          showNotification('Pool finalized successfully!', 'success');
+          setCandidates([]); // Clear pool since everyone is now shortlisted or rejected
+          setShortlistedIds(new Set());
+        } catch (e: any) {
+          showNotification(e.message || 'Failed to finalize pool.', 'error');
+        } finally {
+          setFinalizing(false);
+        }
+      }
+    );
   };
 
   if (loading) {
