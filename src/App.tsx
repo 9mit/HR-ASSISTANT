@@ -47,7 +47,6 @@ export default function App() {
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [modelError, setModelError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isValidatingMock, setIsValidatingMock] = useState(false);
   const [activeTab, setActiveTab] = useState<'batch' | 'pool' | 'rejected'>('batch');
 
   // Ephemeral API keys — stored in memory only, never persisted
@@ -189,43 +188,7 @@ export default function App() {
     }
   };
 
-  const validateMockResumes = async () => {
-    setIsValidatingMock(true);
-    setError(null);
-    setCandidates([]);
-    setSummary(null);
 
-    const formData = new FormData();
-    formData.append('selected_model_id', selectedModelId || 'builtin:heuristic');
-
-    try {
-      const headers = buildApiHeaders(
-        ephemeralHeader ? { 'X-Ephemeral-Keys': ephemeralHeader } : undefined
-      );
-
-      const response = await fetch(`${apiUrl}/api/validate-mock`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Mock validation failed');
-      }
-
-      const data: ProcessResponse = await response.json();
-      setSummary(data.summary);
-      setCandidates(data.candidates);
-      setRole(data.summary.role);
-      setSalaryMin(data.summary.salary_range.minimum.toString());
-      setSalaryMax(data.summary.salary_range.maximum.toString());
-    } catch (caughtError: any) {
-      console.error(caughtError);
-      setError(caughtError.message || 'Failed to run mock validation.');
-    } finally {
-      setIsValidatingMock(false);
-    }
-  };
 
   const activeModel = availableModels.find(m => m.id === selectedModelId) || availableModels[0];
 
@@ -565,23 +528,7 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-stone-900">
-                  <div>
-                    <p className="text-sm font-medium text-stone-200">Mock Data Validation</p>
-                    <p className="text-xs text-stone-500">Verify parser and scorer against 10 sample resumes.</p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      validateMockResumes();
-                      setIsSettingsOpen(false);
-                    }}
-                    disabled={isValidatingMock}
-                    className="flex items-center gap-2 rounded-xl bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-950 transition-colors hover:bg-stone-200 disabled:opacity-50"
-                  >
-                    {isValidatingMock ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
-                    Run Validation
-                  </button>
-                </div>
+
               </div>
             </motion.div>
           </div>

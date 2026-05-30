@@ -244,52 +244,6 @@ async def list_local_models(
     )
 
 
-@api_router.post("/validate-mock", response_model=ProcessResumesResponse)
-async def validate_mock(
-    selected_model_id: str | None = Form(None),
-    x_ephemeral_keys: Optional[str] = Header(None),
-    db: Session = Depends(get_db)
-) -> ProcessResumesResponse:
-    """
-    Validate the system against mock resumes stored in the mock_resumes folder.
-    """
-    if not settings.DEBUG and not settings.ENABLE_MOCK_VALIDATION:
-        raise HTTPException(status_code=403, detail="Mock validation is disabled in production")
-
-    mock_dir = Path(__file__).resolve().parent.parent.parent / "mock_resumes"
-    if not mock_dir.exists():
-        raise HTTPException(status_code=404, detail="Mock resumes directory not found")
-    
-    mock_files = list(mock_dir.glob("*.pdf"))
-    if not mock_files:
-        raise HTTPException(status_code=404, detail="No mock resumes found")
-
-    # Simulate UploadFile objects for the pipeline
-    from fastapi import UploadFile
-    import io
-
-    resumes = []
-    for p in mock_files[:10]: # Limit to 10
-        with open(p, "rb") as f:
-            content = f.read()
-            resumes.append(UploadFile(
-                filename=p.name,
-                file=io.BytesIO(content),
-                size=len(content)
-            ))
-
-    ephemeral_keys = _parse_ephemeral_keys(x_ephemeral_keys)
-
-    return await _run_candidate_pipeline(
-        role="Senior Full Stack Engineer",
-        salary_min=1200000,
-        salary_max=2500000,
-        selected_model_id=selected_model_id,
-        resumes=resumes,
-        db=db,
-        ephemeral_keys=ephemeral_keys,
-    )
-
 
 # ============ Unified Processing (Frontend Entry Point) ============
 
