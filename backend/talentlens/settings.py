@@ -83,7 +83,7 @@ class Settings(BaseSettings):
         "img-src 'self' data: blob:; "
         "font-src 'self' data:; "
         "connect-src 'self'; "
-        "frame-ancestors 'none'; "
+        "frame-ancestors 'self' https://huggingface.co https://*.huggingface.co; "
         "base-uri 'self'; "
         "form-action 'self'"
     )
