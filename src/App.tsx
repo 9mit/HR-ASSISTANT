@@ -83,8 +83,7 @@ export default function App() {
         const data = await response.json();
         setAvailableModels(data.models || []);
         setSelectedModelId(data.default_model_id || data.models?.[0]?.id || '');
-      } catch (caughtError: any) {
-        console.error(caughtError);
+      } catch {
         setModelError('Local model discovery is unavailable, so TalentLens will use its built-in parser.');
         setAvailableModels([
           {
@@ -157,7 +156,6 @@ export default function App() {
       setCandidates(data.candidates);
       setBatchId(data.batch_id);
     } catch (caughtError: any) {
-      console.error(caughtError);
       setError(caughtError.message || 'The local TalentLens API is unavailable. Start FastAPI on port 8000 and try again.');
     } finally {
       setIsProcessing(false);

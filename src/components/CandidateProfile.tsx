@@ -22,17 +22,20 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
   const [isMoving, setIsMoving] = useState(false);
   const apiUrl = getApiUrl();
 
+  const updateDecision = async (decision: Candidate['decision']) => {
+    const response = await fetch(`${apiUrl}/api/candidates/${candidate.id}/decision`, {
+      method: 'PUT',
+      headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ decision })
+    });
+    if (!response.ok) throw new Error('Failed to update decision');
+    onUpdateCandidate({ ...candidate, decision });
+  };
+
   const handleMoveToPool = async () => {
     setIsMoving(true);
     try {
-      const response = await fetch(`${apiUrl}/api/candidates/${candidate.id}/decision`, {
-        method: 'PUT',
-        headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ decision: 'under_consideration' })
-      });
-      if (!response.ok) throw new Error('Failed to update decision');
-      const updatedCandidate = { ...candidate, decision: 'under_consideration' };
-      onUpdateCandidate(updatedCandidate);
+      await updateDecision('under_consideration');
       showNotification('Candidate moved to Under Consideration pool!', 'success');
     } catch (e) {
       showNotification('Error moving candidate to pool.', 'error');
@@ -340,8 +343,14 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
             Close Profile
           </button>
           <button 
-            onClick={() => {
-              onUpdateCandidate({ ...candidate, decision: 'shortlist' });
+            onClick={async () => {
+              try {
+                await updateDecision('shortlist');
+                showNotification('Candidate shortlisted successfully!', 'success');
+              } catch {
+                showNotification('Error shortlisting candidate.', 'error');
+                return;
+              }
               onClose();
             }}
             className="px-5 py-2 bg-emerald-500 text-stone-950 font-bold hover:bg-emerald-400 rounded-xl transition-all shadow-lg shadow-emerald-500/10 text-xs"

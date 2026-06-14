@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Save, Loader2, CheckCircle2, StickyNote } from 'lucide-react';
 import { buildApiHeaders, getApiUrl } from '../api';
+import { useNotifications } from './NotificationContext';
 
 interface NotesPanelProps {
   candidateId: string;
@@ -10,6 +11,7 @@ interface NotesPanelProps {
 }
 
 export function NotesPanel({ candidateId, initialNotes = '', onUpdateNotes }: NotesPanelProps) {
+  const { showNotification } = useNotifications();
   const [notes, setNotes] = useState(initialNotes);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -25,13 +27,15 @@ export function NotesPanel({ candidateId, initialNotes = '', onUpdateNotes }: No
         body: JSON.stringify({ candidate_id: candidateId, notes }),
       });
       
-      if (response.ok) {
-        onUpdateNotes(notes);
-        setIsSaved(true);
-        setTimeout(() => setIsSaved(false), 3000);
+      if (!response.ok) {
+        throw new Error('Failed to save notes');
       }
+
+      onUpdateNotes(notes);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
     } catch (error) {
-      console.error('Failed to save notes:', error);
+      showNotification(error instanceof Error ? error.message : 'Failed to save notes.', 'error');
     } finally {
       setIsSaving(false);
     }

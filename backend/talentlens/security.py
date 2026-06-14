@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import secrets
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -97,12 +98,7 @@ ApiKeyDep = Depends(api_key_dependency)
 
 
 def _constant_time_equals(a: str, b: str) -> bool:
-    if len(a) != len(b):
-        return False
-    result = 0
-    for x, y in zip(a.encode(), b.encode()):
-        result |= x ^ y
-    return result == 0
+    return secrets.compare_digest(a, b)
 
 
 def safe_upload_path(uploads_dir: Path, stored_name: str) -> Path:
@@ -110,7 +106,9 @@ def safe_upload_path(uploads_dir: Path, stored_name: str) -> Path:
     safe_name = sanitize_filename(stored_name)
     base = uploads_dir.resolve()
     target = (base / safe_name).resolve()
-    if not str(target).startswith(str(base)):
+    try:
+        target.relative_to(base)
+    except ValueError:
         raise HTTPException(status_code=400, detail="Invalid file reference")
     if not target.is_file():
         raise HTTPException(status_code=404, detail="File not found")

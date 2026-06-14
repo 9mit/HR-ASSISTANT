@@ -281,8 +281,8 @@ class CandidateResponse(BaseModel):
     decision: Optional[RankingDecision] = None
     
     skills: Optional[List[str]] = None
-    education: Optional[List[EducationItem]] = None
-    experience: Optional[List[ExperienceItem]] = None
+    education: Optional[Any] = None
+    experience: Optional[Any] = None
     certifications: Optional[List[str]] = None
     
     github_url: Optional[str] = None
