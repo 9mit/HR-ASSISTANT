@@ -1,8 +1,207 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { motion } from 'motion/react';
-import { Upload, FileText, XCircle, Briefcase, IndianRupee, Loader2, Users, Cpu, Mail, Building2, Send } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import {
+  Upload,
+  FileText,
+  XCircle,
+  Briefcase,
+  IndianRupee,
+  Loader2,
+  Users,
+  Cpu,
+  Mail,
+  Building2,
+  Send,
+  ChevronDown,
+  Check,
+  Cloud,
+  Lock,
+  AlertTriangle,
+} from 'lucide-react';
 import { LocalModelOption } from '../types';
+
+const CLOUD_PROVIDERS = new Set(['openai', 'anthropic', 'google', 'groq']);
+
+function providerGroupLabel(provider: string): string {
+  if (provider.toLowerCase() === 'builtin') return 'Deterministic';
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
+function isCloudProvider(provider: string): boolean {
+  return CLOUD_PROVIDERS.has(provider.toLowerCase());
+}
+
+interface ModelPickerProps {
+  models: LocalModelOption[];
+  selectedModelId: string;
+  onSelect: (id: string) => void;
+  disabled?: boolean;
+}
+
+function ModelPicker({ models, selectedModelId, onSelect, disabled }: ModelPickerProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const selected = models.find((m) => m.id === selectedModelId) || models[0];
+  const selectedIsCloud = selected ? isCloudProvider(selected.provider) : false;
+
+  const groups = useMemo(() => {
+    const order: string[] = [];
+    const map = new Map<string, LocalModelOption[]>();
+    for (const model of models) {
+      if (!map.has(model.provider)) {
+        map.set(model.provider, []);
+        order.push(model.provider);
+      }
+      map.get(model.provider)!.push(model);
+    }
+    return order.map((provider) => ({
+      provider,
+      label: providerGroupLabel(provider),
+      models: map.get(provider)!,
+    }));
+  }, [models]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        id="ai-model"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        disabled={disabled || models.length === 0}
+        onClick={() => setOpen((v) => !v)}
+        className="group flex w-full items-center gap-3 rounded-2xl border border-stone-850 bg-stone-900/40 py-2.5 pl-4 pr-3 text-left outline-none transition-all hover:border-stone-700 focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <Cpu className="h-4 w-4 shrink-0 text-stone-500 transition-colors group-hover:text-emerald-400/80" />
+        <span className="min-w-0 flex-1 truncate text-sm text-stone-100">
+          {selected?.label || 'Select a model'}
+        </span>
+        {selected && (
+          <span
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+              selectedIsCloud
+                ? 'border-amber-400/20 bg-amber-400/10 text-amber-300'
+                : 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300'
+            }`}
+          >
+            {selectedIsCloud ? <Cloud className="h-2.5 w-2.5" /> : <Lock className="h-2.5 w-2.5" />}
+            {selectedIsCloud ? 'Cloud' : 'Local'}
+          </span>
+        )}
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${
+            selectedIsCloud ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'
+          }`}
+        />
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-stone-500 transition-transform duration-200 ${
+            open ? 'rotate-180 text-emerald-400' : ''
+          }`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            id={listId}
+            role="listbox"
+            aria-labelledby="ai-model"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-stone-800/80 bg-stone-950/95 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.75)] backdrop-blur-xl"
+          >
+            <div className="custom-scrollbar max-h-72 overflow-y-auto p-1.5">
+              {groups.map((group, groupIndex) => (
+                <div key={group.provider} className={groupIndex > 0 ? 'mt-1.5' : ''}>
+                  <div className="flex items-center gap-2 px-2.5 pb-1.5 pt-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                      {group.label}
+                    </span>
+                    <span className="h-px flex-1 bg-stone-800/80" />
+                  </div>
+                  <div className="space-y-0.5">
+                    {group.models.map((model) => {
+                      const active = model.id === selectedModelId;
+                      const cloud = isCloudProvider(model.provider);
+                      const fallback = model.status === 'missing_key';
+                      return (
+                        <button
+                          key={model.id}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          onClick={() => {
+                            onSelect(model.id);
+                            setOpen(false);
+                          }}
+                          className={`flex w-full items-start gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors ${
+                            active
+                              ? 'bg-emerald-500/10 text-stone-50 ring-1 ring-inset ring-emerald-400/25'
+                              : 'text-stone-300 hover:bg-stone-900/80 hover:text-stone-50'
+                          }`}
+                        >
+                          <span
+                            className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${
+                              cloud
+                                ? 'border-amber-400/15 bg-amber-400/5 text-amber-300'
+                                : 'border-emerald-400/15 bg-emerald-400/5 text-emerald-300'
+                            }`}
+                          >
+                            {cloud ? <Cloud className="h-3.5 w-3.5" /> : <Cpu className="h-3.5 w-3.5" />}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                              <span className="truncate text-sm font-medium">{model.label}</span>
+                              {fallback && (
+                                <span className="shrink-0 rounded-md border border-amber-400/20 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-300">
+                                  Fallback
+                                </span>
+                              )}
+                            </span>
+                            <span className="mt-0.5 block truncate text-[10px] text-stone-500">
+                              {model.description ||
+                                (cloud
+                                  ? 'Anonymized evaluation via cloud API'
+                                  : 'Runs fully on-device — data stays local')}
+                            </span>
+                          </span>
+                          {active && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-emerald-400" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 interface UploadPanelProps {
   role: string;
@@ -105,46 +304,29 @@ export function UploadPanel({
         </div>
         <div>
           <label htmlFor="ai-model" className="mb-2 block text-xs font-medium text-stone-400">AI Evaluation Model</label>
-          <div className="relative">
-            <Cpu className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
-            <select
-              id="ai-model"
-              value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
-              disabled={isLoadingModels}
-              className="w-full appearance-none rounded-2xl border border-stone-850 bg-stone-900/40 py-2.5 pl-11 pr-10 text-sm text-stone-100 outline-none transition-all focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/10 disabled:opacity-60"
-            >
-              {[...new Set(availableModels.map(m => m.provider))].map(provider => (
-                <optgroup key={provider} label={provider.toUpperCase() === 'BUILTIN' ? 'DETERMINISTIC' : provider.toUpperCase()}>
-                  {availableModels
-                    .filter(m => m.provider === provider)
-                    .map(model => (
-                      <option key={model.id} value={model.id}>
-                        {model.label} {model.status === 'missing_key' ? '(Fallback)' : ''} {['openai', 'anthropic', 'google', 'groq'].includes(model.provider) ? '☁️' : '🏠'}
-                      </option>
-                    ))
-                  }
-                </optgroup>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
-              <div className={`h-2 w-2 rounded-full ${['openai', 'anthropic', 'google', 'groq'].includes(availableModels.find(m => m.id === selectedModelId)?.provider || '') ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
-            </div>
-          </div>
-          <p className="mt-2 text-[10px] text-stone-500 flex items-center gap-1.5">
+          <ModelPicker
+            models={availableModels}
+            selectedModelId={selectedModelId}
+            onSelect={setSelectedModelId}
+            disabled={isLoadingModels}
+          />
+          <p className="mt-2 flex items-center gap-1.5 text-[10px] text-stone-500">
             {isLoadingModels ? (
               <>
                 <Loader2 className="h-2.5 w-2.5 animate-spin" />
                 Scanning AI runtimes...
               </>
+            ) : isCloudProvider(availableModels.find((m) => m.id === selectedModelId)?.provider || '') ? (
+              <span className="inline-flex items-center gap-1 text-amber-400/80">
+                <AlertTriangle className="h-2.5 w-2.5" />
+                Cloud: anonymized data is sent to{' '}
+                {availableModels.find((m) => m.id === selectedModelId)?.provider}.
+              </span>
             ) : (
-              <>
-                {['openai', 'anthropic', 'google', 'groq'].includes(availableModels.find(m => m.id === selectedModelId)?.provider || '') ? (
-                  <span className="text-amber-400/80">⚠️ Cloud: Anonymized data sent to {availableModels.find(m => m.id === selectedModelId)?.provider}.</span>
-                ) : (
-                  <span className="text-emerald-400/80">🔒 Privacy: Data stays 100% local.</span>
-                )}
-              </>
+              <span className="inline-flex items-center gap-1 text-emerald-400/80">
+                <Lock className="h-2.5 w-2.5" />
+                Privacy: data stays 100% local.
+              </span>
             )}
           </p>
           {modelError && (
@@ -245,9 +427,12 @@ export function UploadPanel({
           </div>
         </div>
         {autoSendEmails && (
-          <p className="mt-3 text-[10px] text-emerald-400/70 leading-normal">
-            ✉️ After scoring, candidates will automatically receive selection/rejection emails from "{hrName || 'HR'} via TalentLens". 
-            Candidates can reply directly to {hrEmail || 'your email'}.
+          <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-normal text-emerald-400/70">
+            <Mail className="mt-0.5 h-3 w-3 shrink-0" />
+            <span>
+              After scoring, candidates will automatically receive selection/rejection emails from &ldquo;{hrName || 'HR'} via TalentLens&rdquo;.
+              Candidates can reply directly to {hrEmail || 'your email'}.
+            </span>
           </p>
         )}
       </div>

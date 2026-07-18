@@ -180,6 +180,9 @@ def validate_production_security(settings_obj: Settings | None = None) -> None:
     if not cfg.DEBUG and not (cfg.API_KEY or "").strip():
         errors.append(
             "API_KEY is required when DEBUG=false. "
+            "Set Space secret API_KEY to a strong random value "
+            "(this is NOT GROQ_API_KEY / OPENAI_API_KEY), "
+            "or set DEBUG=true for demo mode. "
             "Mutating endpoints would otherwise be open on the network."
         )
 

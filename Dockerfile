@@ -55,6 +55,14 @@ RUN chmod -R 777 /app/backend/uploads /app/backend/data
 # Hugging Face Spaces exposes port 7860 ONLY
 EXPOSE 7860
 
+# HF Spaces defaults — demo-friendly (SQLite fallback, no API_KEY required).
+# Override in Space Settings if you want locked-down production:
+#   DEBUG=false  +  API_KEY=<strong secret>  +  DATABASE_URL=postgresql://...
+# Note: GROQ_API_KEY is for the LLM only — it is NOT the backend API_KEY.
+ENV DEBUG=true
+ENV HOST=0.0.0.0
+ENV PORT=7860
+
 # Set working directory to backend so uvicorn can find the talentlens module
 WORKDIR /app/backend
 
