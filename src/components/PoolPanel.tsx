@@ -193,7 +193,7 @@ export function PoolPanel({ onSelectCandidate }: PoolPanelProps) {
                     </td>
                     <td className="px-6 py-5 align-middle">
                       <span className="inline-flex items-center rounded-xl bg-stone-900/40 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/10">
-                        {candidate.score.toFixed(1)}%
+                        {Number.isFinite(candidate.score) ? candidate.score.toFixed(1) : '0.0'}/100
                       </span>
                     </td>
                     <td className="px-6 py-5 align-middle text-xs font-medium text-stone-400">

@@ -90,10 +90,11 @@ export function UploadPanel({
       {/* Row 1: Role + Model + Salary */}
       <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-4">
         <div>
-          <label className="mb-2 block text-xs font-medium text-stone-400">Target Role</label>
+          <label htmlFor="target-role" className="mb-2 block text-xs font-medium text-stone-400">Target Role</label>
           <div className="relative">
             <Briefcase className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
             <input 
+              id="target-role"
               type="text" 
               value={role}
               onChange={(e) => setRole(e.target.value)}
@@ -103,10 +104,11 @@ export function UploadPanel({
           </div>
         </div>
         <div>
-          <label className="mb-2 block text-xs font-medium text-stone-400">AI Evaluation Model</label>
+          <label htmlFor="ai-model" className="mb-2 block text-xs font-medium text-stone-400">AI Evaluation Model</label>
           <div className="relative">
             <Cpu className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
             <select
+              id="ai-model"
               value={selectedModelId}
               onChange={(e) => setSelectedModelId(e.target.value)}
               disabled={isLoadingModels}
@@ -150,10 +152,11 @@ export function UploadPanel({
           )}
         </div>
         <div>
-          <label className="mb-2 block text-xs font-medium text-stone-400">Salary Range Min (LPA)</label>
+          <label htmlFor="salary-min" className="mb-2 block text-xs font-medium text-stone-400">Salary Range Min (LPA)</label>
           <div className="relative">
             <IndianRupee className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
             <input 
+              id="salary-min"
               type="number" 
               value={salaryMin}
               onChange={(e) => setSalaryMin(e.target.value)}
@@ -163,10 +166,11 @@ export function UploadPanel({
           </div>
         </div>
         <div>
-          <label className="mb-2 block text-xs font-medium text-stone-400">Salary Range Max (LPA)</label>
+          <label htmlFor="salary-max" className="mb-2 block text-xs font-medium text-stone-400">Salary Range Max (LPA)</label>
           <div className="relative">
             <IndianRupee className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
             <input 
+              id="salary-max"
               type="number" 
               value={salaryMax}
               onChange={(e) => setSalaryMax(e.target.value)}

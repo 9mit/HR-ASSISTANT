@@ -57,7 +57,7 @@ export function NotesPanel({ candidateId, initialNotes = '', onUpdateNotes }: No
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Add your private notes about this candidate here..."
-            className="flex-1 w-full bg-stone-950/60 border border-stone-850 rounded-xl p-6 text-sm text-stone-300 placeholder:text-stone-600 focus:outline-none focus:ring-2 focus:ring-emerald-450/15 focus:border-emerald-400/50 transition-all resize-none min-h-[250px]"
+            className="flex-1 w-full bg-stone-950/60 border border-stone-850 rounded-xl p-6 text-sm text-stone-300 placeholder:text-stone-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/15 focus:border-emerald-400/50 transition-all resize-none min-h-[250px]"
           />
         </div>
       </div>

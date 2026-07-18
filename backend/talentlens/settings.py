@@ -3,7 +3,7 @@ import secrets
 from pathlib import Path
 from typing import List
 from pydantic import field_validator, model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def _find_env_file() -> str:
@@ -88,20 +88,28 @@ class Settings(BaseSettings):
         "form-action 'self'"
     )
 
-    # CORS — comma-separated in .env, e.g. http://localhost:5173,https://myapp.hf.space
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:7860",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:7860",
-    ]
+    # CORS — comma-separated in .env (stored as string to avoid JSON env decoding)
+    ALLOWED_ORIGINS: str = (
+        "http://localhost:3000,http://localhost:5173,http://localhost:7860,"
+        "http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:7860"
+    )
 
-    class Config:
-        env_file = _find_env_file()
-        case_sensitive = True
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_file=_find_env_file(),
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    @property
+    def allowed_origins_list(self) -> List[str]:
+        raw = (self.ALLOWED_ORIGINS or "").strip()
+        if not raw:
+            return []
+        if raw.startswith("["):
+            import json
+            parsed = json.loads(raw)
+            return [str(o).strip() for o in parsed if str(o).strip()]
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
     @field_validator("DEBUG", mode="before")
     @classmethod
@@ -110,13 +118,6 @@ class Settings(BaseSettings):
             return value
         normalized = str(value).strip().lower()
         return normalized in {"1", "true", "yes", "on", "debug"}
-
-    @field_validator("ALLOWED_ORIGINS", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, value):
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
 
     @model_validator(mode="after")
     def ensure_secret_key(self):
@@ -170,10 +171,27 @@ def validate_api_keys(settings_obj: "Settings", provider_id: str, ephemeral_keys
 
 settings = Settings()
 
-if not settings.DEBUG and not settings.API_KEY:
-    import logging as _logging
 
-    _logging.getLogger(__name__).warning(
-        "API_KEY is not set. Mutating endpoints are open to anyone on the network. "
-        "Set API_KEY in production to require X-API-Key header authentication."
-    )
+def validate_production_security(settings_obj: Settings | None = None) -> None:
+    """Fail closed for production misconfiguration."""
+    cfg = settings_obj or settings
+    errors: list[str] = []
+
+    if not cfg.DEBUG and not (cfg.API_KEY or "").strip():
+        errors.append(
+            "API_KEY is required when DEBUG=false. "
+            "Mutating endpoints would otherwise be open on the network."
+        )
+
+    if not cfg.DEBUG:
+        for origin in cfg.allowed_origins_list:
+            if origin.strip() == "*":
+                errors.append("ALLOWED_ORIGINS must not include '*' when DEBUG=false.")
+                break
+
+    if errors:
+        raise RuntimeError(" ".join(errors))
+
+
+# Fail closed at import time for production deployments
+validate_production_security(settings)

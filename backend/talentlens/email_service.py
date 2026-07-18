@@ -14,7 +14,12 @@ logger = logging.getLogger(__name__)
 class EmailService:
     def __init__(self):
         self.use_resend = bool(settings.RESEND_API_KEY)
-        self.use_smtp = bool(settings.SMTP_SERVER and settings.SMTP_USERNAME)
+        self.use_smtp = bool(settings.SMTP_SERVER and settings.SMTP_USERNAME and settings.SMTP_PASSWORD)
+
+    @property
+    def is_configured(self) -> bool:
+        """True when a real outbound email provider is configured."""
+        return self.use_resend or self.use_smtp
 
     async def send_email(self, candidate_id: int, recipient_email: str, subject: str, body: str, email_type: str, db: Session) -> Optional[Email]:
         """Send an email using configured backend (Resend or SMTP)."""
@@ -42,9 +47,11 @@ class EmailService:
             elif self.use_smtp:
                 await self._send_via_smtp(recipient_email, subject, body)
             else:
-                # Mock sending if no configuration is provided
-                logger.info(f"Mocking email to {recipient_email}: {subject}")
-                await asyncio.sleep(0.5)
+                # Persist as draft when outbound email is not configured
+                logger.info(f"Email provider not configured; drafting to {recipient_email}: {subject}")
+                email_record.status = "draft"
+                db.commit()
+                return email_record
 
             # Update status
             email_record.status = "sent"

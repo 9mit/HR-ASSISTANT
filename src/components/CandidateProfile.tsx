@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useEffect, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Candidate } from '../types';
 import { XCircle, Github, ShieldCheck, FileText, Mail, User, Briefcase, GraduationCap, AlertCircle, StickyNote, Loader2 } from 'lucide-react';
-import { AuditLog } from './AuditLog';
-import { EmailPanel } from './EmailPanel';
-import { NotesPanel } from './NotesPanel';
-import { buildApiHeaders, getApiUrl } from '../api';
+import { buildApiHeaders, downloadAuthenticatedFile, getApiUrl } from '../api';
 import { useNotifications } from './NotificationContext';
+
+const AuditLog = lazy(() => import('./AuditLog').then((m) => ({ default: m.AuditLog })));
+const EmailPanel = lazy(() => import('./EmailPanel').then((m) => ({ default: m.EmailPanel })));
+const NotesPanel = lazy(() => import('./NotesPanel').then((m) => ({ default: m.NotesPanel })));
 
 interface CandidateProfileProps {
   candidate: Candidate;
@@ -16,17 +17,36 @@ interface CandidateProfileProps {
 
 type Tab = 'overview' | 'resume' | 'audit' | 'github' | 'email' | 'notes';
 
+function TabFallback() {
+  return (
+    <div className="flex items-center justify-center py-16 text-stone-500 text-xs gap-2">
+      <Loader2 className="w-4 h-4 animate-spin" />
+      Loading…
+    </div>
+  );
+}
+
 export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: CandidateProfileProps) {
   const { showNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [isMoving, setIsMoving] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const apiUrl = getApiUrl();
+  const score = Number.isFinite(candidate.score) ? candidate.score : 0;
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   const updateDecision = async (decision: Candidate['decision']) => {
     const response = await fetch(`${apiUrl}/api/candidates/${candidate.id}/decision`, {
       method: 'PUT',
       headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ decision })
+      body: JSON.stringify({ decision }),
     });
     if (!response.ok) throw new Error('Failed to update decision');
     onUpdateCandidate({ ...candidate, decision });
@@ -37,55 +57,78 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
     try {
       await updateDecision('under_consideration');
       showNotification('Candidate moved to Under Consideration pool!', 'success');
-    } catch (e) {
+    } catch {
       showNotification('Error moving candidate to pool.', 'error');
     } finally {
       setIsMoving(false);
     }
   };
 
+  const handleDownload = useCallback(async () => {
+    if (!candidate.stored_file) return;
+    setIsDownloading(true);
+    try {
+      await downloadAuthenticatedFile(
+        `${apiUrl}/api/uploads/${candidate.stored_file}`,
+        candidate.file_name || 'resume'
+      );
+    } catch {
+      showNotification('Unable to download resume. Check API key and try again.', 'error');
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [apiUrl, candidate.file_name, candidate.stored_file, showNotification]);
+
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: User },
-    { id: 'resume', label: 'Original Resume', icon: FileText },
-    { id: 'audit', label: 'Fairness Audit', icon: ShieldCheck },
-    { id: 'github', label: 'GitHub Projects', icon: Github },
-    { id: 'email', label: 'Automated Email', icon: Mail },
-    { id: 'notes', label: 'Notes', icon: StickyNote },
+    { id: 'overview' as const, label: 'Overview', icon: User },
+    { id: 'resume' as const, label: 'Original Resume', icon: FileText },
+    { id: 'audit' as const, label: 'Fairness Audit', icon: ShieldCheck },
+    { id: 'github' as const, label: 'GitHub Projects', icon: Github },
+    { id: 'email' as const, label: 'Automated Email', icon: Mail },
+    { id: 'notes' as const, label: 'Notes', icon: StickyNote },
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
         className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
+        aria-hidden="true"
       />
-      
-      <motion.div 
+
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="candidate-profile-title"
         initial={{ opacity: 0, y: 40, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.95 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         className="relative glass-panel rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
       >
-        {/* Header */}
         <div className="px-8 py-5 border-b border-stone-850 bg-stone-900/30 flex justify-between items-start">
           <div>
-            <h2 className="text-2xl font-display font-bold text-stone-50 mb-1">{candidate.name}</h2>
+            <h2 id="candidate-profile-title" className="text-2xl font-display font-bold text-stone-50 mb-1">
+              {candidate.name || candidate.alias}
+            </h2>
             <div className="flex items-center gap-4 text-xs text-stone-400">
-              <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-stone-500" /> {candidate.email || 'No email provided'}</span>
-              {candidate.score > 0 && (
+              <span className="flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-stone-500" /> {candidate.email || 'No email provided'}
+              </span>
+              {score > 0 && (
                 <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-                  Match Score: {candidate.score.toFixed(1)}/100
+                  Match Score: {score.toFixed(1)}/100
                 </span>
               )}
             </div>
           </div>
           <div className="flex items-center gap-3">
             {candidate.decision !== 'under_consideration' && candidate.decision !== 'shortlist' && (
-              <button 
+              <button
+                type="button"
                 onClick={handleMoveToPool}
                 disabled={isMoving}
                 className="bg-stone-100 hover:bg-white text-stone-950 px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shadow-lg disabled:opacity-50"
@@ -93,8 +136,10 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
                 {isMoving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Move to Pool'}
               </button>
             )}
-            <button 
-              onClick={onClose} 
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close candidate profile"
               className="text-stone-500 hover:text-stone-300 bg-stone-900/40 hover:bg-stone-800 p-2 rounded-xl border border-stone-850/50 transition-all"
             >
               <XCircle className="w-5 h-5" />
@@ -102,20 +147,22 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex px-8 border-b border-stone-850 bg-stone-900/10 overflow-x-auto hide-scrollbar">
+        <div className="flex px-8 border-b border-stone-850 bg-stone-900/10 overflow-x-auto hide-scrollbar" role="tablist" aria-label="Candidate profile sections">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as Tab)}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(tab.id)}
                 className={`relative flex items-center gap-2 px-6 py-4 text-xs font-semibold tracking-wide transition-colors whitespace-nowrap ${isActive ? 'text-emerald-400' : 'text-stone-500 hover:text-stone-300'}`}
               >
                 <tab.icon className="w-3.5 h-3.5" />
                 {tab.label}
                 {isActive && (
-                  <motion.div 
+                  <motion.div
                     layoutId="activeProfileTab"
                     className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400"
                   />
@@ -124,9 +171,8 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
             );
           })}
         </div>
-        
-        {/* Content */}
-        <div className="p-8 overflow-y-auto flex-1 bg-stone-950/20 custom-scrollbar">
+
+        <div className="p-8 overflow-y-auto flex-1 bg-stone-950/20 custom-scrollbar" role="tabpanel">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -151,17 +197,17 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
                     <div className="space-y-8">
                       <section>
                         <h3 className="text-sm font-semibold text-stone-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <Briefcase className="w-4.5 h-4.5 text-emerald-400" />
+                          <Briefcase className="w-4 h-4 text-emerald-400" />
                           Experience
                         </h3>
                         <div className="glass-panel-interactive rounded-2xl p-6 text-sm text-stone-300 whitespace-pre-wrap leading-relaxed">
                           {candidate.experience_summary || 'No experience summary available'}
                         </div>
                       </section>
-                      
+
                       <section>
                         <h3 className="text-sm font-semibold text-stone-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <GraduationCap className="w-4.5 h-4.5 text-emerald-400" />
+                          <GraduationCap className="w-4 h-4 text-emerald-400" />
                           Education
                         </h3>
                         <div className="glass-panel-interactive rounded-2xl p-6 text-sm text-stone-300 whitespace-pre-wrap leading-relaxed">
@@ -169,15 +215,15 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
                         </div>
                       </section>
                     </div>
-                    
+
                     <div className="space-y-8">
                       <section>
                         <h3 className="text-sm font-semibold text-stone-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <FileText className="w-4.5 h-4.5 text-emerald-400" />
+                          <FileText className="w-4 h-4 text-emerald-400" />
                           Suggested Interview Questions
                         </h3>
                         <ul className="space-y-4">
-                          {candidate.interview_questions?.map((q, i) => (
+                          {(candidate.interview_questions || []).map((q, i) => (
                             <li key={i} className="flex gap-4 glass-panel-interactive rounded-2xl p-5">
                               <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold text-xs shrink-0">
                                 {i + 1}
@@ -199,45 +245,37 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
                 <div className="h-full min-h-[500px] flex flex-col">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-semibold text-stone-300 uppercase tracking-wider flex items-center gap-2">
-                      <FileText className="w-4.5 h-4.5 text-emerald-400" />
-                      {candidate.file_name}
+                      <FileText className="w-4 h-4 text-emerald-400" />
+                      {candidate.file_name || 'Resume'}
                     </h3>
                     {candidate.stored_file && (
-                      <a 
-                        href={`${apiUrl}/api/uploads/${candidate.stored_file}`} 
-                        download={candidate.file_name}
-                        className="px-4 py-2 bg-stone-900 border border-stone-850 text-stone-200 text-xs font-semibold rounded-xl transition-all hover:bg-stone-850"
+                      <button
+                        type="button"
+                        onClick={() => void handleDownload()}
+                        disabled={isDownloading}
+                        className="px-4 py-2 bg-stone-900 border border-stone-850 text-stone-200 text-xs font-semibold rounded-xl transition-all hover:bg-stone-850 disabled:opacity-50"
                       >
-                        Download File
-                      </a>
+                        {isDownloading ? 'Downloading…' : 'Download File'}
+                      </button>
                     )}
                   </div>
-                  
+
                   {candidate.stored_file ? (
                     <div className="flex-1 flex flex-col items-center justify-center glass-panel rounded-2xl p-8 text-center min-h-[400px]">
                       <FileText className="w-14 h-14 text-emerald-500/35 mb-4" />
                       <h4 className="text-base font-semibold text-stone-200 mb-1.5">Resume Document</h4>
                       <p className="text-stone-500 text-xs max-w-sm mb-6 leading-relaxed">
-                        For security reasons, Chrome blocks inline document previewing in sandboxed environments. 
-                        Please open or download the file to view it safely.
+                        For security reasons, inline document previewing is limited in sandboxed environments.
+                        Download the file to view it safely (authenticated when API key is configured).
                       </p>
-                      <div className="flex items-center gap-4">
-                        <a 
-                          href={`${apiUrl}/api/uploads/${candidate.stored_file}`} 
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-5 py-2.5 bg-stone-900 hover:bg-stone-850 text-stone-200 text-xs font-semibold rounded-xl transition-all border border-stone-850 shadow-md"
-                        >
-                          Open in New Tab
-                        </a>
-                        <a 
-                          href={`${apiUrl}/api/uploads/${candidate.stored_file}`} 
-                          download={candidate.file_name}
-                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-stone-950 text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/10"
-                        >
-                          Download File
-                        </a>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleDownload()}
+                        disabled={isDownloading}
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-stone-950 text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/10 disabled:opacity-50"
+                      >
+                        {isDownloading ? 'Downloading…' : 'Download File'}
+                      </button>
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center glass-panel rounded-2xl p-8 text-center min-h-[400px]">
@@ -248,34 +286,37 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
               )}
 
               {activeTab === 'audit' && (
-                <AuditLog audit={candidate.audit} />
+                <Suspense fallback={<TabFallback />}>
+                  <AuditLog
+                    audit={candidate.audit}
+                    counterfactuals={candidate.counterfactuals || []}
+                  />
+                </Suspense>
               )}
 
               {activeTab === 'github' && (
                 <div className="space-y-6">
-                  {candidate.github?.repos ? (
+                  {candidate.github?.repos?.length ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {candidate.github.repos.map((repo: any, i: number) => (
-                        <motion.div 
+                      {candidate.github.repos.map((repo, i) => (
+                        <motion.div
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: i * 0.08 }}
-                          key={i} 
+                          transition={{ delay: Math.min(i, 8) * 0.05 }}
+                          key={repo.url || `${repo.name}-${i}`}
                           className="glass-panel-interactive rounded-2xl p-6 group"
                         >
                           <h4 className="font-display font-semibold text-stone-100 group-hover:text-emerald-400 transition-colors">{repo.name}</h4>
                           <p className="text-xs text-stone-400 mt-2 mb-4 line-clamp-2 leading-relaxed">{repo.description}</p>
                           <div className="flex items-center gap-4 text-[10px] font-semibold text-stone-500">
-                            {repo.language && (
+                            {repo.primary_language && (
                               <span className="flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                {repo.language}
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                {repo.primary_language}
                               </span>
                             )}
-                            {repo.stars && (
-                              <span className="flex items-center gap-1">
-                                ⭐ {repo.stars}
-                              </span>
+                            {typeof repo.stars === 'number' && repo.stars > 0 && (
+                              <span className="flex items-center gap-1">{repo.stars} stars</span>
                             )}
                           </div>
                         </motion.div>
@@ -301,11 +342,11 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
                         GitHub Projects (Fallback)
                       </h3>
                       <p className="text-xs text-emerald-300/80 mb-4">{candidate.github.note || 'Please use the analyzer link below to view the repositories manually.'}</p>
-                      <a 
-                        href={candidate.github.fallback_url} 
-                        target="_blank" 
+                      <a
+                        href={candidate.github.fallback_url}
+                        target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-2 bg-emerald-500 text-stone-950 px-5 py-2.5 rounded-xl font-semibold text-xs hover:bg-emerald-450 transition-all shadow-lg shadow-emerald-500/10"
+                        className="inline-flex items-center gap-2 bg-emerald-500 text-stone-950 px-5 py-2.5 rounded-xl font-semibold text-xs hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/10"
                       >
                         Open GitHub Repo Analyser
                       </a>
@@ -315,34 +356,39 @@ export function CandidateProfile({ candidate, onClose, onUpdateCandidate }: Cand
               )}
 
               {activeTab === 'email' && (
-                <EmailPanel 
-                  emailContent={candidate.communication?.body || ''} 
-                  candidateName={candidate.name || candidate.alias} 
-                  candidateEmail={candidate.email || ''}
-                  candidateId={candidate.id}
-                />
+                <Suspense fallback={<TabFallback />}>
+                  <EmailPanel
+                    emailContent={candidate.communication?.body || ''}
+                    candidateName={candidate.name || candidate.alias}
+                    candidateEmail={candidate.email || ''}
+                    candidateId={candidate.id}
+                  />
+                </Suspense>
               )}
 
               {activeTab === 'notes' && (
-                <NotesPanel
-                  candidateId={candidate.id}
-                  initialNotes={candidate.notes}
-                  onUpdateNotes={(notes) => onUpdateCandidate({ ...candidate, notes })}
-                />
+                <Suspense fallback={<TabFallback />}>
+                  <NotesPanel
+                    candidateId={candidate.id}
+                    initialNotes={candidate.notes}
+                    onUpdateNotes={(notes) => onUpdateCandidate({ ...candidate, notes })}
+                  />
+                </Suspense>
               )}
             </motion.div>
           </AnimatePresence>
         </div>
-        
-        {/* Footer */}
+
         <div className="px-8 py-5 border-t border-stone-850 bg-stone-900/30 flex justify-end gap-4">
-          <button 
+          <button
+            type="button"
             onClick={onClose}
             className="px-5 py-2 text-stone-400 font-semibold hover:text-stone-100 hover:bg-stone-900/40 rounded-xl transition-all border border-transparent hover:border-stone-850"
           >
             Close Profile
           </button>
-          <button 
+          <button
+            type="button"
             onClick={async () => {
               try {
                 await updateDecision('shortlist');

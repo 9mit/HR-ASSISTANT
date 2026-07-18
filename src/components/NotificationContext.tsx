@@ -59,14 +59,14 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       {children}
       
       {/* Toast Notification Container */}
-      <div className="fixed bottom-6 right-6 z-55 flex flex-col gap-3 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+      <div className="fixed bottom-6 right-6 z-[55] flex flex-col gap-3 max-w-sm w-full pointer-events-none px-4 sm:px-0">
         <AnimatePresence>
           {notifications.map((n) => {
             const Icon = n.type === 'success' ? CheckCircle2 : n.type === 'error' ? AlertCircle : Info;
             const borderClass = n.type === 'success' 
               ? 'border-emerald-500/20 bg-stone-900/90 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)]' 
               : n.type === 'error' 
-                ? 'border-rose-500/20 bg-stone-900/90 text-rose-450 shadow-[0_0_20px_rgba(244,63,94,0.1)]' 
+                ? 'border-rose-500/20 bg-stone-900/90 text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.1)]' 
                 : 'border-cyan-500/20 bg-stone-900/90 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.1)]';
             
             return (
@@ -84,6 +84,8 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
                   </div>
                 </div>
                 <button
+                  type="button"
+                  aria-label="Dismiss notification"
                   onClick={() => setNotifications((prev) => prev.filter((notif) => notif.id !== n.id))}
                   className="text-stone-500 hover:text-stone-300 transition-colors shrink-0 mt-0.5"
                 >
@@ -98,7 +100,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
       {/* Confirmation Modal */}
       <AnimatePresence>
         {confirmModal && (
-          <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[55] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

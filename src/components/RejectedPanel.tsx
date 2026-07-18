@@ -74,7 +74,7 @@ export function RejectedPanel({ onSelectCandidate }: RejectedPanelProps) {
   if (loading) {
     return (
       <div className="p-20 flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-rose-400 text-glow-rose" />
+        <Loader2 className="w-10 h-10 animate-spin text-rose-400" />
         <span className="text-stone-500 font-medium text-sm">Loading rejected pool...</span>
       </div>
     );
@@ -99,7 +99,7 @@ export function RejectedPanel({ onSelectCandidate }: RejectedPanelProps) {
       <div className="flex flex-col md:flex-row md:items-center justify-between glass-panel p-6 rounded-[2rem] shadow-xl shadow-black/30 gap-4 border-l-4 border-l-rose-500/80">
         <div>
           <h2 className="text-xl font-display font-semibold text-stone-100 flex items-center gap-2">
-            <Mail className="w-5 h-5 text-rose-450" />
+            <Mail className="w-5 h-5 text-rose-400" />
             Rejected Candidates
           </h2>
           <p className="text-xs md:text-sm text-stone-400 mt-1">Send a batch email to BCC all rejected candidates in one click.</p>
@@ -107,7 +107,7 @@ export function RejectedPanel({ onSelectCandidate }: RejectedPanelProps) {
         <button 
           onClick={handleMassReject}
           disabled={candidates.length === 0}
-          className="relative overflow-hidden group bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-450 hover:to-orange-450 text-stone-950 px-6 py-3 rounded-xl font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_0_25px_rgba(244,63,94,0.2)] hover:shadow-[0_0_35px_rgba(244,63,94,0.4)] flex items-center justify-center gap-2 cursor-pointer"
+          className="relative overflow-hidden group bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-400 hover:to-orange-400 text-stone-950 px-6 py-3 rounded-xl font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_0_25px_rgba(244,63,94,0.2)] hover:shadow-[0_0_35px_rgba(244,63,94,0.4)] flex items-center justify-center gap-2 cursor-pointer"
         >
           <Send className="w-4 h-4 text-stone-950" />
           <span>Send Mass Rejection</span>
@@ -151,7 +151,7 @@ export function RejectedPanel({ onSelectCandidate }: RejectedPanelProps) {
                     </td>
                     <td className="px-6 py-5 align-middle">
                       <span className="inline-flex items-center rounded-xl bg-stone-900/40 px-3 py-1.5 text-xs font-semibold text-rose-400 border border-rose-500/10">
-                        {candidate.score.toFixed(1)}%
+                        {Number.isFinite(candidate.score) ? candidate.score.toFixed(1) : '0.0'}/100
                       </span>
                     </td>
                     <td className="px-8 py-5 align-middle text-right">

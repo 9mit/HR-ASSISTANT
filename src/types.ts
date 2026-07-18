@@ -6,6 +6,18 @@ export interface ScoreFactor {
   explanation: string;
 }
 
+export interface CounterfactualLever {
+  id: string;
+  label: string;
+  category: string;
+  current_score: number;
+  predicted_score: number;
+  current_decision: string;
+  predicted_decision: string;
+  delta: number;
+  explanation: string;
+}
+
 export interface CandidateAudit {
   overview: string;
   decision: string;
@@ -87,6 +99,7 @@ export interface Candidate {
   interview_questions: string[];
   communication?: CandidateCommunication | null;
   audit?: CandidateAudit | null;
+  counterfactuals?: CounterfactualLever[];
   github?: GitHubAnalysis | null;
   file_name: string;
   stored_file?: string | null;

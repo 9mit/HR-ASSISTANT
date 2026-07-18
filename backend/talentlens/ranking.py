@@ -147,6 +147,7 @@ class RankingEngine:
         self,
         candidate_data: Dict[str, Any],
         job_requirements: Dict[str, Any],
+        apply_tiebreaker: bool = True,
     ) -> Dict[str, Any]:
         """
         Rank a single candidate against job requirements.
@@ -154,6 +155,7 @@ class RankingEngine:
         Args:
             candidate_data: Candidate information
             job_requirements: Job requirements from batch
+            apply_tiebreaker: When False, skip uniqueness offset (used by counterfactuals)
             
         Returns:
             Ranking result with scores and decision
@@ -212,9 +214,18 @@ class RankingEngine:
                     + cert_score * self.certification_weight
                 )
                 result["overall_score"] = overall_score
+                result["skill_match_score"] = skill_score
+                result["experience_score"] = experience_score
+                result["project_quality_score"] = project_score
+                result["score_breakdown"] = {
+                    "skill": {"score": skill_score, "weight": self.skill_weight},
+                    "experience": {"score": experience_score, "weight": self.experience_weight},
+                    "projects": {"score": project_score, "weight": self.project_weight},
+                    "certifications": {"score": cert_score, "weight": self.certification_weight},
+                }
                 
-                # IMPORTANT: Apply tiebreaker BEFORE returning to ensure uniqueness
-                result = self.apply_uniqueness_tiebreaker(result, candidate_data)
+                if apply_tiebreaker:
+                    result = self.apply_uniqueness_tiebreaker(result, candidate_data)
                 return result
 
             # Calculate weighted overall score
@@ -244,8 +255,8 @@ class RankingEngine:
                 "certifications": {"score": cert_score, "weight": self.certification_weight},
             }
 
-            # CRITICAL: Apply tiebreaker to ensure NO two candidates get same score
-            result = self.apply_uniqueness_tiebreaker(result, candidate_data)
+            if apply_tiebreaker:
+                result = self.apply_uniqueness_tiebreaker(result, candidate_data)
 
             return result
 

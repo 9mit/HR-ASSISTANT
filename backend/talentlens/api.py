@@ -28,6 +28,8 @@ from .schemas import (
     CandidateAudit,
     CandidateCommunication,
     ScoreFactor,
+    CounterfactualLever,
+    CounterfactualResponse,
     CandidateResponse,
     SalaryRange,
     SaveNotesRequest,
@@ -44,10 +46,11 @@ from .ranking import (
     check_batch_score_uniqueness,
     generate_score_report,
 )
+from .counterfactual import CounterfactualEngine, build_ranking_inputs_from_candidate
 from .audit import AuditService
 from .llm_service import LLMService, LLMAnalysis, BUILTIN_MODEL_ID
 from .email_service import email_service
-from .utils import compact_whitespace, unique_preserve_order, sanitize_filename
+from .utils import compact_whitespace, unique_preserve_order, sanitize_filename, safe_format
 from .security import (
     ApiKeyDep,
     RateLimitMiddleware,
@@ -123,8 +126,8 @@ app.add_middleware(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=bool(settings.ALLOWED_ORIGINS),
+    allow_origins=settings.allowed_origins_list,
+    allow_credentials=bool(settings.allowed_origins_list),
     allow_methods=["GET", "POST", "PUT", "OPTIONS"],
     allow_headers=["Content-Type", "X-API-Key", "X-Ephemeral-Keys", "Authorization"],
     expose_headers=["Content-Disposition"],
@@ -141,6 +144,7 @@ api_router = APIRouter(prefix="/api", dependencies=[ApiKeyDep])
 resume_parser = ResumeParser()
 github_scraper = GitHubScraper()
 ranking_engine = RankingEngine()
+counterfactual_engine = CounterfactualEngine(ranking_engine)
 audit_service = AuditService()
 llm_service = LLMService()
 
@@ -273,6 +277,16 @@ async def process_resumes(
         )
 
     if auto_send_emails:
+        if not (settings.API_KEY or "").strip():
+            raise HTTPException(
+                status_code=403,
+                detail="Auto-send email requires API_KEY to be configured on the server",
+            )
+        if not email_service.is_configured:
+            raise HTTPException(
+                status_code=400,
+                detail="Auto-send requires SMTP or Resend to be configured. Emails will remain drafts otherwise.",
+            )
         if not hr_email or len(hr_email) > 254:
             raise HTTPException(status_code=400, detail="Valid hr_email is required for auto-send")
         try:
@@ -337,6 +351,7 @@ async def _run_candidate_pipeline(
         excluded_by_salary = 0
         missing_info = 0
         duplicates_merged = 0
+        failed_count = 0
         seen_identifiers = set() 
         
         # 2a. Validate API keys for cloud providers (using ephemeral if available)
@@ -348,6 +363,7 @@ async def _run_candidate_pipeline(
         # 2. Process Files
         for idx, file in enumerate(resumes):
             try:
+                nested = db.begin_nested()
                 contents = await file.read()
                 safe_name = validate_upload_file(file.filename, len(contents))
                 validate_magic_bytes(file.filename, contents)
@@ -375,17 +391,24 @@ async def _run_candidate_pipeline(
                 if has_identity:
                     seen_identifiers.add(identifier)
 
-                # AI Analysis (Optional — uses ephemeral keys if provided)
-                local_analysis = await llm_service.analyze_resume(
-                    model_id=selected_model.id,
-                    role=role,
-                    salary_min=salary_min,
-                    salary_max=salary_max,
-                    required_skills=required_skills,
-                    resume_text=parsed_data.redacted_text or parsed_data.raw_text,
-                    parsed_resume=parsed_data.model_dump(),
-                    ephemeral_keys=ephemeral_keys,
-                )
+                # AI Analysis (Optional — uses ephemeral keys if provided; never log key values)
+                try:
+                    local_analysis = await asyncio.wait_for(
+                        llm_service.analyze_resume(
+                            model_id=selected_model.id,
+                            role=role,
+                            salary_min=salary_min,
+                            salary_max=salary_max,
+                            required_skills=required_skills,
+                            resume_text=parsed_data.redacted_text or parsed_data.raw_text,
+                            parsed_resume=parsed_data.model_dump(),
+                            ephemeral_keys=ephemeral_keys,
+                        ),
+                        timeout=float(settings.LOCAL_LLM_TIMEOUT_SECONDS) + 15.0,
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning("LLM analysis timed out for %s; continuing with deterministic parse", safe_name)
+                    local_analysis = None
                 parsed_data = _merge_parsed_resume(parsed_data, local_analysis)
                 if local_analysis:
                     local_ai_used_count += 1
@@ -407,16 +430,21 @@ async def _run_candidate_pipeline(
                 db.add(candidate)
                 db.flush()
                 
-                # 3. GitHub Intelligence
+                # 3. GitHub Intelligence (bounded timeout)
                 github_info = None
                 if candidate.github_url:
                     try:
-                        github_info = github_scraper.analyze_profile(candidate.github_url)
+                        github_info = await asyncio.wait_for(
+                            asyncio.to_thread(github_scraper.analyze_profile, candidate.github_url),
+                            timeout=float(settings.GITHUB_SCRAPE_TIMEOUT) * 3 + 5.0,
+                        )
                         # Merge GitHub email if resume didn't have one
                         github_email = github_info.get("email") if github_info else None
                         if github_email and not candidate.email:
                             candidate.email = github_email
-                            logger.info(f"Merged email from GitHub for {candidate.alias}: {github_email}")
+                            logger.info(f"Merged email from GitHub for {candidate.alias}")
+                    except asyncio.TimeoutError:
+                        logger.warning(f"GitHub timeout for {candidate.alias}")
                     except Exception as ge:
                         logger.warning(f"GitHub skip for {candidate.alias}: {str(ge)}")
 
@@ -448,6 +476,14 @@ async def _run_candidate_pipeline(
                     if isinstance(ranking_result["decision"], RankingDecision)
                     else str(ranking_result["decision"])
                 )
+
+                # Counterfactual fit levers (deterministic what-if)
+                cf_levers: list[CounterfactualLever] = []
+                try:
+                    cf_levers_raw = counterfactual_engine.simulate(c_data, job_reqs)
+                    cf_levers = [CounterfactualLever(**lever) for lever in cf_levers_raw]
+                except Exception as cf_exc:
+                    logger.warning("Counterfactual simulation skipped for %s: %s", candidate.alias, cf_exc)
                 
                 # Update Candidate
                 candidate.score = ranking_result["overall_score"]
@@ -493,18 +529,19 @@ async def _run_candidate_pipeline(
                 
                 if decision_value in templates:
                     tmpl = templates[decision_value]
+                    format_kwargs = {
+                        "candidate_name": candidate.name or candidate.alias,
+                        "job_title": role,
+                        "company_name": company_name or "Our Company",
+                    }
                     comm_response = CandidateCommunication(
-                        subject=tmpl["subject"].format(job_title=role),
-                        body=tmpl["body"].format(
-                            candidate_name=candidate.name or candidate.alias,
-                            job_title=role,
-                            company_name=company_name or "Our Company"
-                        ),
+                        subject=safe_format(tmpl["subject"], **format_kwargs),
+                        body=safe_format(tmpl["body"], **format_kwargs),
                         status="draft",
                     )
-                    
-                    # Send email automatically if requested
-                    if auto_send_emails and candidate.email:
+
+                    # Send email automatically if requested (already gated at endpoint entry)
+                    if auto_send_emails and candidate.email and email_service.is_configured:
                         email_record = await email_service.send_email(
                             candidate_id=candidate.id,
                             recipient_email=candidate.email,
@@ -566,6 +603,7 @@ async def _run_candidate_pipeline(
                     file_name=file.filename,
                     stored_file=filename,
                     audit=audit_response,
+                    counterfactuals=cf_levers,
                     communication=comm_response,
                 )
                 
@@ -577,10 +615,13 @@ async def _run_candidate_pipeline(
                 
                 if decision_value == "salary_mismatch":
                     excluded_by_salary += 1
+
+                nested.commit()
                     
             except Exception as fe:
                 logger.error(f"Failed candidate {file.filename}: {str(fe)}")
-                
+                failed_count += 1
+
                 # Add a failed record so the frontend knows this file failed
                 error_record = CandidateRecord(
                     id=f"failed_{idx}",
@@ -603,6 +644,8 @@ async def _run_candidate_pipeline(
             "Deterministic scoring remained active for final ranking decisions.",
             "Project scores are neutral (50) for candidates without GitHub — no bias.",
         ]
+        if failed_count:
+            fairness_highlights.append(f"Partial failures: {failed_count} of {len(resumes)} files could not be processed.")
         if selected_model.id != BUILTIN_MODEL_ID:
             fairness_highlights.append(f"AI enhanced {local_ai_used_count} of {processed_count} processed resumes.")
 
@@ -701,6 +744,71 @@ async def get_candidate_profile(candidate_id: int, db: Session = Depends(get_db)
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
     return candidate
+
+
+@api_router.get("/candidates/{candidate_id}/counterfactuals", response_model=CounterfactualResponse)
+async def get_candidate_counterfactuals(
+    candidate_id: int,
+    db: Session = Depends(get_db),
+) -> CounterfactualResponse:
+    """Recompute what-if levers that would change this candidate's score/decision."""
+    candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    batch = db.query(Batch).filter(Batch.id == candidate.batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found for candidate")
+
+    raw = candidate.raw_record or {}
+    github_block = raw.get("github") or {}
+    repos = github_block.get("repos") or []
+    # Normalize frontend repo shape back to ranking project dicts
+    github_repos = [
+        {
+            "name": r.get("name", "unknown"),
+            "description": r.get("description"),
+            "url": r.get("url"),
+            "stars": r.get("stars", 0),
+            "forks": r.get("forks", 0),
+            "language": r.get("primary_language") or r.get("language"),
+            "readme_quality_score": r.get("readme_quality_score", 0),
+        }
+        for r in repos
+        if isinstance(r, dict)
+    ]
+
+    c_data = build_ranking_inputs_from_candidate(
+        skills=candidate.skills or raw.get("skills"),
+        experience_years=raw.get("experience_years"),
+        certifications=candidate.certifications or raw.get("certifications"),
+        education=candidate.education or raw.get("education"),
+        salary_expectation=candidate.salary_min
+        if candidate.salary_min is not None
+        else raw.get("salary_expectation"),
+        github_repos=github_repos,
+        resume_projects=raw.get("resume_projects") or [],
+        parsed_resume=raw.get("summary") or "",
+    )
+    job_reqs = {
+        "required_skills": batch.required_skills or [],
+        "salary_min": batch.salary_min,
+        "salary_max": batch.salary_max,
+    }
+    levers = [
+        CounterfactualLever(**lever)
+        for lever in counterfactual_engine.simulate(c_data, job_reqs)
+    ]
+
+    # Cache onto raw_record for subsequent UI loads
+    if isinstance(raw, dict):
+        raw = dict(raw)
+        raw["counterfactuals"] = [lever.model_dump(mode="json") for lever in levers]
+        candidate.raw_record = raw
+        db.commit()
+
+    return CounterfactualResponse(candidate_id=str(candidate.id), levers=levers)
+
 
 @api_router.post("/save-note")
 async def save_note(request: SaveNotesRequest, db: Session = Depends(get_db)) -> ApiMessage:
@@ -856,11 +964,12 @@ async def export_candidates(batch_id: int, db: Session = Depends(get_db)):
 async def download_upload(stored_file: str):
     """Serve a single uploaded resume with path-traversal protection."""
     path = safe_upload_path(uploads_dir, stored_file)
+    download_name = sanitize_filename(path.name)
     return FileResponse(
         path,
         media_type="application/octet-stream",
-        filename=path.name,
-        headers={"Content-Disposition": f'attachment; filename="{path.name}"'},
+        filename=download_name,
+        headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
     )
 
 

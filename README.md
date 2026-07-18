@@ -41,8 +41,7 @@ A **bias-free, fully-local** HR candidate ranking platform built with FastAPI, R
 - **Backend**: FastAPI with modular microservices
 - **Database**: PostgreSQL with automatic SQLite fallback
 - **Frontend**: React 19 + TypeScript with Tailwind CSS
-- **Deployment**: Docker Compose, Kubernetes-ready, Nginx proxy
-- **CI/CD**: GitHub Actions testing + automatic builds
+- **Deployment**: Docker Compose, Hugging Face Spaces Docker image, optional Nginx proxy
 
 ---
 
@@ -211,39 +210,25 @@ TalentLens works completely free with its built-in Deterministic Engine. If you 
 ## 📋 API Endpoints
 
 ### Core Workflow
-1. **POST /set-target** — Define job role and requirements
-   ```json
-   {
-     "job_title": "Senior Software Engineer",
-     "salary_min": 100000,
-     "salary_max": 150000,
-     "required_skills": ["Python", "FastAPI", "PostgreSQL"],
-     "preferred_skills": ["React", "Docker"]
-   }
-   ```
+1. **POST /api/process-resumes** — Unified pipeline (upload + parse + rank + audit + optional email)
+2. **POST /api/set-target** — Create a job batch target (legacy/stepwise helper)
 
-2. **POST /upload-resumes** — Upload and parse resumes
-   - File multipart form
-   - Returns: batch_id, upload_count, processing_status
+### Details & Pool
+- **GET /api/candidates/{id}** — Full candidate profile
+- **POST /api/save-note** — HR annotations
+- **PUT /api/candidates/{id}/decision** — Update decision / move to pool
+- **GET /api/pool/candidates?decision=…** — Pool by decision
+- **POST /api/pool/finalize** — Shortlist selected / reject remainder
+- **GET /api/export-candidates/{batch_id}** — CSV export
+- **GET /api/uploads/{stored_file}** — Authenticated resume download
 
-3. **POST /rank-candidates** — Score all candidates
-   - Triggers full pipeline for batch
-   - Returns: ranked_count
-
-4. **GET /ranked-candidates** — Get results grouped by tier
-   - Returns: candidates sorted by decision (shortlist, review, rejected)
-
-### Details & Audit
-- **GET /candidates/{id}** — Full candidate profile
-- **GET /audit-log/{id}** — Fairness audit with decision rationale
-- **POST /save-note** — HR annotations
-- **GET /smtp-status** — SMTP configuration status
-
-### Communication
-- **POST /send-email** — Send or draft an email (uses SMTP if configured)
-- Templates available for: shortlist, review, clarification, rejection
+### Public
+- **GET /api/health** — Liveness
+- **GET /api/local-models** — Built-in + discovered LLM backends
 
 **Full API docs at:** http://localhost:8000/docs (when running)
+
+> Note: Older README endpoints such as `/upload-resumes` and `/rank-candidates` are not implemented; use `/api/process-resumes`.
 
 ---
 
@@ -322,31 +307,6 @@ VITE_API_URL=http://localhost:8000
 
 ---
 
-## 🧪 Testing
-
-### Run Backend Tests
-```bash
-cd backend
-pip install pytest pytest-asyncio pytest-cov
-pytest -v --cov=talentlens
-```
-
-### Run Frontend Tests
-```bash
-npm run test  # (if test setup added)
-```
-
-### Integration Tests
-```bash
-# Start services in Docker
-docker-compose up -d
-
-# Run full pipeline test
-pytest tests/integration/test_pipeline.py -v
-```
-
----
-
 ## 📊 Ranking Algorithm
 
 ### Scoring Breakdown
@@ -399,18 +359,9 @@ docker exec -i hr_ranking_db psql -U postgres hr_ranking_db < backup.sql
 
 ---
 
-## ☸️ Kubernetes Deployment
+## Kubernetes
 
-Create manifests in `k8s/`:
-
-```bash
-kubectl apply -f k8s/postgres.yaml
-kubectl apply -f k8s/backend.yaml
-kubectl apply -f k8s/frontend.yaml
-kubectl apply -f k8s/ingress.yaml
-```
-
-See deployment guide for full Kubernetes setup.
+Kubernetes manifests are not shipped in this repository yet.
 
 ---
 
@@ -438,11 +389,12 @@ See deployment guide for full Kubernetes setup.
 - [x] `.env` files excluded via `.gitignore`
 - [x] Ephemeral API key support (never persisted)
 - [x] Masked key input in frontend
+- [x] Fail-closed: `API_KEY` required when `DEBUG=false`
+- [x] SQLite fallback disabled when `DEBUG=false`
+- [x] Upload magic-byte validation + path traversal guards
 - [ ] Enable HTTPS/SSL in `nginx.conf`
 - [ ] Configure database backups
-- [ ] Set up role-based access control (if multi-user)
-- [ ] Audit database query logs
-- [ ] Validate file uploads (size, type)
+- [ ] Role-based access control (multi-user)
 
 ---
 
@@ -484,10 +436,8 @@ lsof -i :8000
 
 ## 📚 Documentation
 
-- **Architecture**: See [ARCHITECTURE.md](ARCHITECTURE.md)
-- **API Reference**: See [API.md](API.md) or http://localhost:8000/docs
-- **Deployment Guide**: See [DEPLOYMENT.md](DEPLOYMENT.md)
-- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) (if available)
+- **API Reference**: http://localhost:8000/docs (OpenAPI when the backend is running)
+- **This README**: setup, SMTP, scoring overview
 
 ---
 
@@ -498,11 +448,6 @@ lsof -i :8000
 3. Commit changes (`git commit -m 'Add amazing feature'`)
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
-
-All PRs must pass:
-- ✅ Backend tests (`pytest`)
-- ✅ Frontend tests (`npm test`)
-- ✅ Security scan (Trivy)
 
 ---
 

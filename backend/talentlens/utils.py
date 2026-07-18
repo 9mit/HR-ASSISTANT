@@ -62,6 +62,16 @@ def sanitize_filename(name: str) -> str:
     return safe or f"resume_{uuid.uuid4().hex[:8]}"
 
 
+def safe_format(template: str, **kwargs: object) -> str:
+    """Replace {placeholders} without str.format brace-injection risks."""
+    result = template or ""
+    for key, value in kwargs.items():
+        token = "{" + key + "}"
+        safe_value = str(value if value is not None else "").replace("{", "(").replace("}", ")")
+        result = result.replace(token, safe_value)
+    return result
+
+
 def parse_salary_value(raw_value: str | None) -> float | None:
     if not raw_value:
         return None

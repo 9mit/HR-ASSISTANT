@@ -107,6 +107,15 @@ export default function App() {
 
 
 
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsSettingsOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSettingsOpen]);
+
   const removeFile = (index: number) => {
     setFiles((current) => current.filter((_, i) => i !== index));
   };
@@ -219,7 +228,9 @@ export default function App() {
               </div>
             </div>
             <button 
+              type="button"
               onClick={() => setIsSettingsOpen(true)}
+              aria-label="Open settings"
               className="group flex h-9 w-9 items-center justify-center rounded-xl border border-stone-850 bg-stone-900/40 transition-all hover:bg-emerald-500/10 hover:border-emerald-500/30"
             >
               <Settings className="h-4 w-4 text-stone-400 transition-colors group-hover:text-emerald-400" />
@@ -282,8 +293,11 @@ export default function App() {
           </div>
         </section>
 
-        <div className="flex gap-6 border-b border-stone-850">
+        <div className="flex gap-6 border-b border-stone-850" role="tablist" aria-label="Main workspace">
           <button 
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'batch'}
             onClick={() => setActiveTab('batch')}
             className={`relative pb-4 text-sm font-medium transition-all ${activeTab === 'batch' ? 'text-emerald-400 font-semibold' : 'text-stone-500 hover:text-stone-300'}`}
           >
@@ -293,6 +307,9 @@ export default function App() {
             )}
           </button>
           <button 
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'pool'}
             onClick={() => setActiveTab('pool')}
             className={`relative pb-4 text-sm font-medium transition-all ${activeTab === 'pool' ? 'text-emerald-400 font-semibold' : 'text-stone-500 hover:text-stone-300'}`}
           >
@@ -302,6 +319,9 @@ export default function App() {
             )}
           </button>
           <button 
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'rejected'}
             onClick={() => setActiveTab('rejected')}
             className={`relative pb-4 text-sm font-medium transition-all ${activeTab === 'rejected' ? 'text-emerald-400 font-semibold' : 'text-stone-500 hover:text-stone-300'}`}
           >
@@ -430,6 +450,9 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="settings-title"
               className="relative w-full max-w-2xl overflow-y-auto max-h-[90vh] rounded-[2.5rem] border border-stone-800 bg-stone-950 p-8 shadow-[0_40px_100px_rgba(0,0,0,0.6)]"
             >
               <div className="mb-8 flex items-center justify-between">
@@ -438,11 +461,11 @@ export default function App() {
                     <Activity className="h-5 w-5 text-emerald-300" />
                   </div>
                   <div>
-                    <h2 className="font-display text-xl font-semibold text-stone-50">System Intelligence</h2>
+                    <h2 id="settings-title" className="font-display text-xl font-semibold text-stone-50">System Intelligence</h2>
                     <p className="text-sm text-stone-500">Configure AI runtimes and manage API keys.</p>
                   </div>
                 </div>
-                <button onClick={() => setIsSettingsOpen(false)} className="text-stone-500 hover:text-stone-300">
+                <button type="button" onClick={() => setIsSettingsOpen(false)} aria-label="Close settings" className="text-stone-500 hover:text-stone-300">
                   <XCircle className="h-6 w-6" />
                 </button>
               </div>
@@ -475,6 +498,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setKeyVisibility(prev => ({ ...prev, [key]: !prev[key] }))}
+                            aria-label={keyVisibility[key] ? `Hide ${label} API key` : `Show ${label} API key`}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 transition-colors"
                           >
                             {keyVisibility[key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

@@ -2,7 +2,7 @@
 from pathlib import Path
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, QueuePool
 import logging
 
 from .settings import settings
@@ -16,29 +16,65 @@ class Base(DeclarativeBase):
 
 
 def _build_engine():
-    """Build the SQLAlchemy engine with automatic fallback to SQLite."""
+    """Build the SQLAlchemy engine with production-safe pooling and fallback rules."""
     db_url = settings.DATABASE_URL
 
-    # Try PostgreSQL first
     if db_url.startswith("postgresql"):
         try:
+            pool_kwargs = {}
+            if settings.DEBUG:
+                # NullPool is fine for local reload workflows
+                pool_kwargs["poolclass"] = NullPool
+            else:
+                pool_kwargs.update(
+                    poolclass=QueuePool,
+                    pool_size=5,
+                    max_overflow=10,
+                    pool_pre_ping=True,
+                    pool_recycle=1800,
+                )
+
             engine = create_engine(
                 db_url,
                 echo=settings.DEBUG,
-                poolclass=NullPool,
                 connect_args={"connect_timeout": 10},
+                **pool_kwargs,
             )
-            # Quick connectivity check
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
+                try:
+                    conn.execute(text(
+                        "SELECT table_name FROM information_schema.tables "
+                        "WHERE table_schema = 'public' LIMIT 1"
+                    ))
+                except Exception as health_exc:
+                    logger.warning(
+                        "PostgreSQL health check failed (%s).",
+                        health_exc,
+                    )
+                    engine.dispose()
+                    raise health_exc
             logger.info("Connected to PostgreSQL: %s", db_url.split("@")[-1])
             return engine
         except Exception as exc:
+            if not settings.DEBUG:
+                # Production must not silently fall back to SQLite
+                raise RuntimeError(
+                    "PostgreSQL is required when DEBUG=false. "
+                    f"Connection failed: {exc}"
+                ) from exc
             logger.warning(
-                "PostgreSQL not reachable (%s). Falling back to SQLite.", exc
+                "PostgreSQL not reachable or unhealthy (%s). Falling back to SQLite.",
+                exc,
             )
 
-    # SQLite fallback
+    # SQLite — local/dev only
+    if not settings.DEBUG and not db_url.startswith("sqlite"):
+        raise RuntimeError(
+            "Refusing to use SQLite when DEBUG=false. "
+            "Set a reachable DATABASE_URL (postgresql://...) for production."
+        )
+
     sqlite_path = Path(__file__).resolve().parent.parent / "data" / "talentlens.db"
     sqlite_path.parent.mkdir(parents=True, exist_ok=True)
     sqlite_url = f"sqlite:///{sqlite_path}"
@@ -52,7 +88,6 @@ def _build_engine():
 
 engine = _build_engine()
 
-# Create session factory
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
@@ -72,31 +107,25 @@ def get_db():
 def init_db():
     """Initialize database tables and run simple migrations."""
     logger.info("Initializing database...")
-    # Ensure all models are imported so they are registered in Base.metadata
     try:
-        from . import models
+        from . import models  # noqa: F401
         logger.info(f"Registered tables: {Base.metadata.tables.keys()}")
     except Exception as e:
         logger.error(f"Error importing models: {e}")
-        
+
     Base.metadata.create_all(bind=engine)
     logger.info("Base.metadata.create_all called")
-    
-    # Robust migration using SQLAlchemy Inspector
+
     try:
         inspector = inspect(engine)
         tables = inspector.get_table_names()
-        
+
         if "candidates" in tables:
             columns = [c["name"] for c in inspector.get_columns("candidates")]
             if "raw_record" not in columns:
                 logger.info("Migrating: Adding raw_record column to candidates table")
                 with engine.begin() as conn:
-                    # SQLite JSON type maps to TEXT
                     conn.execute(text("ALTER TABLE candidates ADD COLUMN raw_record JSON"))
-        
-        # Also check for 'merged_duplicate_ids' which was added earlier
-        # and 'notes' table just in case
     except Exception as e:
         logger.warning(f"Migration check skipped or failed: {e}")
 

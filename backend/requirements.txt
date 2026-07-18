@@ -1,31 +1,30 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi==0.136.3
+uvicorn[standard]==0.49.0
 python-multipart==0.0.27
-pydantic==2.5.0
+pydantic==2.13.4
 pydantic-settings==2.1.0
 sqlalchemy==2.0.23
 psycopg2-binary==2.9.9
 alembic==1.13.1
-pypdf==3.17.0
+pypdf==6.13.2
 python-docx==0.8.11
 python-pptx==0.6.21
 requests==2.33.0
 httpx==0.25.2
 beautifulsoup4==4.12.2
-lxml==4.9.3
+lxml==6.1.1
 defusedxml==0.7.1
 spacy==3.7.2
-scikit-learn==1.3.2
-python-Levenshtein==0.21.1
-sentence-transformers==2.2.2
-torch==2.1.1
+scikit-learn==1.9.0
+sentence-transformers==5.5.1
+transformers==5.12.0
+torch==2.12.0
 email-validator==2.1.0
 aiosmtplib==3.0.1
 python-json-logger==2.0.7
-pytest==7.4.3
-pytest-asyncio==0.21.1
-typing-extensions==4.8.0
+typing-extensions>=4.14.1
 python-dotenv==1.2.2
 # NOTE: Cloud LLM SDKs (openai, anthropic, google-generativeai, groq)
 # are NOT needed. All cloud API calls go through httpx directly.
 # This keeps the install lean and avoids unnecessary dependencies.
+# python-Levenshtein removed — unused and requires MSVC to build on Windows.

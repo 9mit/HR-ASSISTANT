@@ -164,6 +164,25 @@ class ScoreFactor(BaseModel):
     explanation: str
 
 
+class CounterfactualLever(BaseModel):
+    """One what-if change that would alter score and/or decision."""
+    id: str
+    label: str
+    category: str
+    current_score: float
+    predicted_score: float
+    current_decision: Decision
+    predicted_decision: Decision
+    delta: float
+    explanation: str
+
+
+class CounterfactualResponse(BaseModel):
+    """Counterfactual fit simulation for a candidate."""
+    candidate_id: str
+    levers: List[CounterfactualLever] = Field(default_factory=list)
+
+
 class LocalModelOption(BaseModel):
     """Selectable local model option exposed to the frontend."""
     model_config = ConfigDict(protected_namespaces=())
@@ -233,6 +252,7 @@ class CandidateRecord(BaseModel):
     interview_questions: List[str] = Field(default_factory=list)
     communication: Optional[CandidateCommunication] = None
     audit: Optional[CandidateAudit] = None
+    counterfactuals: List[CounterfactualLever] = Field(default_factory=list)
     github: Optional[GitHubAnalysis] = None
     file_name: Optional[str] = None
     stored_file: Optional[str] = None
