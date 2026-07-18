@@ -129,6 +129,21 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def huggingface_space_defaults(self):
+        """Public HF Spaces often set DEBUG=false without API_KEY — force demo boot."""
+        on_hf_space = bool(os.environ.get("SPACE_ID") or os.environ.get("SPACE_HOST"))
+        if on_hf_space and not self.DEBUG and not (self.API_KEY or "").strip():
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Hugging Face Space detected without API_KEY. "
+                "Forcing DEBUG=true so the Space can start. "
+                "Set secret API_KEY (not GROQ_API_KEY) to run with DEBUG=false."
+            )
+            self.DEBUG = True
+        return self
+
 
 def get_api_key_for_provider(provider_id: str, ephemeral_keys: dict | None = None) -> str:
     """
